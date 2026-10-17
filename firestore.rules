@@ -43,9 +43,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Customer Reviews collection - public read, validated create, helpfulCount update, admin delete
+    // Customer Reviews collection - public get & list (do not apply isValidId on list queries), validated create, helpfulCount update, admin delete
     match /reviews/{reviewId} {
-      allow read: if isValidId(reviewId);
+      allow get: if isValidId(reviewId);
+      allow list: if true;
       allow create: if isValidId(reviewId) && isValidReview(request.resource.data);
       allow update: if isValidId(reviewId) 
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['helpfulCount'])
@@ -55,7 +56,8 @@ service cloud.firestore {
 
     // Site Configuration - readable by all, writable only by nazrulcxd@gmail.com
     match /siteConfig/{configId} {
-      allow read: if isValidId(configId);
+      allow get: if isValidId(configId);
+      allow list: if isAdmin();
       allow write: if isValidId(configId) && isAdmin();
     }
 
@@ -85,7 +87,8 @@ service cloud.firestore {
 
     // Connection testing doc
     match /test/{docId} {
-      allow read, write: if isValidId(docId);
+      allow get: if isValidId(docId);
+      allow write: if isValidId(docId);
     }
   }
 }
