@@ -28,6 +28,16 @@ service cloud.firestore {
         && (!('helpfulCount' in data) || data.helpfulCount is number);
     }
 
+    function isValidOrderSubmission(data) {
+      return data.orderId is string && data.orderId.size() >= 8 && data.orderId.size() <= 64
+        && data.paypalTxId is string && data.paypalTxId.size() >= 10 && data.paypalTxId.size() <= 64
+        && data.buyerEmail is string && data.buyerEmail.size() >= 5 && data.buyerEmail.size() <= 150
+        && data.users is number && data.users >= 1 && data.users <= 50
+        && data.amount is number && data.amount >= 20
+        && data.status in ['pending', 'verified']
+        && data.createdAt is string && data.createdAt.size() <= 64;
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;
@@ -43,10 +53,34 @@ service cloud.firestore {
       allow delete: if isValidId(reviewId) && isAdmin();
     }
 
-    // Site Configuration (Shop Demo Video, Global details) - readable by all, writable only by nazrulcxd@gmail.com
+    // Site Configuration - readable by all, writable only by nazrulcxd@gmail.com
     match /siteConfig/{configId} {
       allow read: if isValidId(configId);
       allow write: if isValidId(configId) && isAdmin();
+    }
+
+    // Product License Keys - single document lookup allowed by exact key, listing & creation restricted to Admin
+    match /licenses/{licenseKey} {
+      allow get: if isValidId(licenseKey);
+      allow list: if isAdmin();
+      allow create, delete: if isValidId(licenseKey) && isAdmin();
+      allow update: if isValidId(licenseKey) && (
+        isAdmin() ||
+        (
+          resource.data.status == 'active'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['downloadsCount', 'lastDownloadAt', 'buyerEmail'])
+          && request.resource.data.downloadsCount is number
+          && request.resource.data.downloadsCount <= resource.data.maxDownloads
+        )
+      );
+    }
+
+    // Customer Payment Orders - single document lookup by ID, list only by Admin, create validated, full control by Admin
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId);
+      allow list: if isAdmin();
+      allow create: if isValidId(orderId) && isValidOrderSubmission(request.resource.data);
+      allow update, delete: if isValidId(orderId) && isAdmin();
     }
 
     // Connection testing doc

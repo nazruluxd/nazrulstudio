@@ -52,7 +52,7 @@
     },
     "siteConfig": {
       "title": "Site Configuration",
-      "description": "Persisted site content and shop video settings",
+      "description": "Persisted site content, shop video settings, and payment security config",
       "type": "object",
       "properties": {
         "global": {
@@ -66,8 +66,107 @@
         "shopVideo": {
           "type": "object",
           "description": "Shop interactive demo video and simulation configuration"
+        },
+        "paymentSecurity": {
+          "type": "object",
+          "description": "Payment verification mode and return token settings"
         }
       }
+    },
+    "license": {
+      "title": "Product License Key",
+      "description": "Verified license key for downloading Serial Placer",
+      "type": "object",
+      "properties": {
+        "licenseKey": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Unique license key code (e.g. SP-XXXX-XXXX-XXXX)"
+        },
+        "buyerEmail": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Authorized customer email"
+        },
+        "paypalTxId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Associated PayPal Transaction ID"
+        },
+        "users": {
+          "type": "number",
+          "description": "Number of licensed seats"
+        },
+        "amountPaid": {
+          "type": "number",
+          "description": "Total USD amount paid"
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "active, pending, or revoked"
+        },
+        "downloadsCount": {
+          "type": "number",
+          "description": "Number of times files were downloaded"
+        },
+        "maxDownloads": {
+          "type": "number",
+          "description": "Maximum allowed download sessions"
+        },
+        "createdAt": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ISO timestamp of creation"
+        }
+      },
+      "required": ["licenseKey", "status", "users"]
+    },
+    "order": {
+      "title": "Customer Payment Order",
+      "description": "PayPal payment verification record and download authorization",
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Order ID or PayPal Transaction ID"
+        },
+        "paypalTxId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "PayPal Transaction ID from receipt"
+        },
+        "buyerEmail": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Customer PayPal email address"
+        },
+        "users": {
+          "type": "number",
+          "description": "Number of user licenses purchased"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Total amount in USD"
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "pending, verified, or revoked"
+        },
+        "licenseKey": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Issued license key once verified"
+        },
+        "createdAt": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ISO timestamp"
+        }
+      },
+      "required": ["orderId", "paypalTxId", "buyerEmail", "users", "amount", "status"]
     }
   },
   "firestore": {
@@ -78,6 +177,14 @@
     "/siteConfig/{configId}": {
       "schema": "siteConfig",
       "description": "Global website configuration and demo video settings"
+    },
+    "/licenses/{licenseKey}": {
+      "schema": "license",
+      "description": "Verified software license keys for Serial Placer download"
+    },
+    "/orders/{orderId}": {
+      "schema": "order",
+      "description": "PayPal transaction verification requests and verified orders"
     }
   }
 }

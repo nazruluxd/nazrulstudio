@@ -1,27 +1,34 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../firebase';
 import {
   Shield,
   ArrowRight,
   ExternalLink,
-  ChevronDown,
-  ChevronUp,
   Check,
   X,
   Play,
   ArrowLeft,
-  Download,
   Lock,
   Video,
-  Settings,
   Sparkles,
-  RefreshCw,
-  Sliders,
-  Maximize2,
-  Tv,
+  KeyRound,
+  ShieldAlert,
+  Loader2,
+  Mail,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import { CustomerReviews } from './CustomerReviews';
 import { ShopVideoConfig } from '../../types';
 import { parseVideoUrl } from '../../utils/videoUtils';
+import {
+  recordPayPalCheckoutLaunch,
+  submitPayPalTransactionVerification,
+  verifyExistingLicenseOrOrder,
+  saveVerifiedSessionToken,
+  OrderRecord,
+} from '../../utils/licenseSecurity';
 
 interface ShopPageProps {
   onBackToStudio: () => void;
@@ -40,7 +47,23 @@ export const ShopPage = ({
   onOpenAdmin,
 }: ShopPageProps) => {
   const [usersCount, setUsersCount] = useState(1);
+  const [buyerEmail, setBuyerEmail] = useState('');
+  const [buyerEmailError, setBuyerEmailError] = useState('');
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+
+  // Post-PayPal transaction / license verification state
+  const [txIdInput, setTxIdInput] = useState('');
+  const [txError, setTxError] = useState('');
+  const [isSubmittingTx, setIsSubmittingTx] = useState(false);
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+
+  // Inline existing license / order unlock state inside pricing card
+  const [showLicenseUnlock, setShowLicenseUnlock] = useState(false);
+  const [unlockCodeInput, setUnlockCodeInput] = useState('');
+  const [unlockEmailInput, setUnlockEmailInput] = useState('');
+  const [unlockError, setUnlockError] = useState('');
+  const [isVerifyingUnlock, setIsVerifyingUnlock] = useState(false);
+
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isPlayingDemo, setIsPlayingDemo] = useState(false);
   const [demoViewMode, setDemoViewMode] = useState<'video' | 'simulation'>('video');
@@ -76,10 +99,95 @@ export const ShopPage = ({
   const pad = (num: number) => String(num).padStart(4, '0');
   const totalPrice = (usersCount * UNIT_PRICE).toFixed(2);
 
+  // Real-time listener for pending order approval in Firestore
+  useEffect(() => {
+    if (!pendingOrderId) return;
+    const unsub = onSnapshot(doc(db, 'orders', pendingOrderId), (snap) => {
+      if (snap.exists()) {
+        const ord = snap.data() as OrderRecord;
+        if (ord.status === 'verified') {
+          saveVerifiedSessionToken({
+            orderId: ord.orderId,
+            licenseKey: ord.licenseKey || ord.orderId,
+            buyerEmail: ord.buyerEmail,
+            users: ord.users || usersCount,
+            verifiedAt: Date.now(),
+          });
+          setShowCheckoutModal(false);
+          setPendingOrderId(null);
+          onGoToThankYou(ord.licenseKey || ord.orderId, ord.users || usersCount);
+        } else if (ord.status === 'revoked') {
+          setTxError('This transaction was declined or revoked by the administrator.');
+          setPendingOrderId(null);
+        }
+      }
+    });
+    return () => unsub();
+  }, [pendingOrderId, usersCount, onGoToThankYou]);
+
   const handlePaypalClick = () => {
+    setBuyerEmailError('');
+    const cleanEmail = buyerEmail.trim().toLowerCase();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setBuyerEmailError('Please enter your email address first so we can bind your License Key & download access.');
+      return;
+    }
+
+    // Record checkout launch timestamp & buyer email for cryptographic verification
+    recordPayPalCheckoutLaunch(cleanEmail, usersCount, Number(totalPrice));
+    setTxError('');
+    setPendingOrderId(null);
+
     // Open PayPal Payment Link in new tab
     window.open(PAYPAL_PAYMENT_URL, '_blank', 'noopener,noreferrer');
     setShowCheckoutModal(true);
+  };
+
+  const handleVerifyCheckoutTx = async (e: FormEvent) => {
+    e.preventDefault();
+    setTxError('');
+    setIsSubmittingTx(true);
+    try {
+      const result = await submitPayPalTransactionVerification({
+        paypalTxId: txIdInput,
+        buyerEmail,
+        users: usersCount,
+        amount: Number(totalPrice),
+      });
+
+      if (!result.success) {
+        setTxError(result.error || 'Payment verification failed.');
+        return;
+      }
+
+      if (result.status === 'verified') {
+        setShowCheckoutModal(false);
+        onGoToThankYou(result.licenseKey || result.orderId, usersCount);
+      } else if (result.status === 'pending' && result.orderId) {
+        setPendingOrderId(result.orderId);
+      }
+    } finally {
+      setIsSubmittingTx(false);
+    }
+  };
+
+  const handleUnlockExistingLicense = async (e: FormEvent) => {
+    e.preventDefault();
+    setUnlockError('');
+    setIsVerifyingUnlock(true);
+    try {
+      const res = await verifyExistingLicenseOrOrder(unlockCodeInput, unlockEmailInput);
+      if (!res.verified) {
+        setUnlockError(
+          res.error ||
+            'Access Denied: License Key or Order ID could not be verified in our database.'
+        );
+        return;
+      }
+      onGoToThankYou(res.licenseKey || res.orderId, res.users || usersCount);
+    } finally {
+      setIsVerifyingUnlock(false);
+    }
   };
 
   const faqs = [
@@ -779,9 +887,38 @@ export const ShopPage = ({
                 <b className="text-xl font-bold text-white">${totalPrice} USD</b>
               </div>
 
+              {/* Buyer Email Binding Input (Required before Checkout) */}
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-bold text-[#cdd4e3] flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Mail size={13} className="text-[#ffa41b]" /> Your Email for License Delivery
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[#ffa41b]">
+                    Required
+                  </span>
+                </label>
+                <input
+                  type="email"
+                  value={buyerEmail}
+                  onChange={(e) => {
+                    setBuyerEmail(e.target.value);
+                    if (buyerEmailError) setBuyerEmailError('');
+                  }}
+                  placeholder="you@studio.com"
+                  className="w-full px-4 py-3 rounded-xl bg-[#0b0d12] border border-[#232a38] focus:border-[#ffa41b] text-sm text-white placeholder-[#5e6778] outline-none transition-colors"
+                />
+                {buyerEmailError && (
+                  <p className="text-xs text-red-400 font-medium flex items-start gap-1.5 pt-1">
+                    <ShieldAlert size={14} className="shrink-0 mt-0.5" />
+                    <span>{buyerEmailError}</span>
+                  </p>
+                )}
+              </div>
+
               {/* Primary PayPal Checkout Button */}
               <div className="space-y-3">
                 <button
+                  type="button"
                   onClick={handlePaypalClick}
                   className="w-full py-4 rounded-full font-bold text-base bg-gradient-to-r from-[#ffa41b] to-[#ffcf4a] text-[#1a1204] shadow-[0_10px_30px_rgba(255,164,27,0.35)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
                 >
@@ -790,18 +927,92 @@ export const ShopPage = ({
                 </button>
 
                 <p className="text-[11px] text-center text-[#9aa4b8]">
-                  🔒 Checkout is handled securely by PayPal.
+                  🔒 Protected by PayPal & Firestore License Gatekeeper. Downloads unlock only after verified payment.
                 </p>
               </div>
 
-              {/* Already purchased trigger */}
-              <div className="text-center pt-2 border-t border-white/5">
+              {/* Secure License Key / Verified Order Unlock (Replaces unverified bypass) */}
+              <div className="pt-3 border-t border-white/5 space-y-3">
                 <button
-                  onClick={() => onGoToThankYou('VERIFIED-' + Math.random().toString(36).substring(2, 8).toUpperCase(), usersCount)}
-                  className="text-xs text-[#9aa4b8] hover:text-[#ffa41b] transition-colors underline underline-offset-2 inline-flex items-center gap-1"
+                  type="button"
+                  onClick={() => {
+                    setShowLicenseUnlock((prev) => !prev);
+                    setUnlockError('');
+                  }}
+                  className="w-full text-xs text-[#9aa4b8] hover:text-[#ffa41b] transition-colors font-semibold inline-flex items-center justify-center gap-1.5"
                 >
-                  <Download size={12} /> Already purchased? Access downloads & files
+                  <KeyRound size={13} className="text-[#ffa41b]" />
+                  <span>
+                    {showLicenseUnlock
+                      ? 'Hide License Key / Order Verification'
+                      : 'Have a verified License Key? Unlock download'}
+                  </span>
                 </button>
+
+                {showLicenseUnlock && (
+                  <form
+                    onSubmit={handleUnlockExistingLicense}
+                    className="p-4 rounded-2xl bg-[#0b0d12] border border-[#232a38] space-y-3 text-left animate-in fade-in duration-200"
+                  >
+                    <div className="flex items-center gap-2 text-xs font-bold text-white">
+                      <Lock size={13} className="text-[#37d67a]" />
+                      <span>Verified License / Order Gatekeeper</span>
+                    </div>
+                    <p className="text-[11px] text-[#9aa4b8] leading-relaxed">
+                      Enter your issued License Key (<span className="font-mono text-white">SP-XXXX-XXXX-XXXX</span>) or approved PayPal Transaction ID to unlock your download files.
+                    </p>
+
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        required
+                        value={unlockCodeInput}
+                        onChange={(e) => {
+                          setUnlockCodeInput(e.target.value.toUpperCase());
+                          setUnlockError('');
+                        }}
+                        placeholder="License Key (SP-XXXX-XXXX-XXXX) or TX ID"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#12161f] border border-[#232a38] focus:border-[#ffa41b] text-xs font-mono text-white placeholder-[#5e6778] outline-none"
+                      />
+                      <input
+                        type="email"
+                        required
+                        value={unlockEmailInput}
+                        onChange={(e) => {
+                          setUnlockEmailInput(e.target.value);
+                          setUnlockError('');
+                        }}
+                        placeholder="Registered Buyer Email"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#12161f] border border-[#232a38] focus:border-[#ffa41b] text-xs text-white placeholder-[#5e6778] outline-none"
+                      />
+                    </div>
+
+                    {unlockError && (
+                      <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-[11px] text-red-300 flex items-start gap-2">
+                        <ShieldAlert size={14} className="text-red-400 shrink-0 mt-0.5" />
+                        <span>{unlockError}</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={isVerifyingUnlock}
+                      className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-[#ffa41b] hover:text-[#1a1204] text-white font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isVerifyingUnlock ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>Verifying with Security Server...</span>
+                        </>
+                      ) : (
+                        <>
+                          <KeyRound size={14} />
+                          <span>Verify License & Unlock Files</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
 
@@ -918,54 +1129,139 @@ export const ShopPage = ({
         </div>
       </footer>
 
-      {/* Post-PayPal Action Confirmation Modal */}
+      {/* High-Security Post-PayPal Verification Modal */}
       {showCheckoutModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-[#131C31] border border-[#232a38] rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl space-y-6 text-center relative animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+          <div className="bg-[#131C31] border border-[#232a38] rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl space-y-5 text-left relative animate-in fade-in zoom-in-95 duration-200">
             <button
+              type="button"
               onClick={() => setShowCheckoutModal(false)}
               className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-white/5"
             >
               <X size={18} />
             </button>
 
-            <div className="w-16 h-16 rounded-full bg-[#ffa41b]/15 text-[#ffa41b] flex items-center justify-center mx-auto">
-              <Lock size={30} />
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-[#ffa41b]/15 border border-[#ffa41b]/30 text-[#ffa41b] flex items-center justify-center shrink-0">
+                <Lock size={24} />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-[#ffa41b]">
+                  Payment Verification Gate
+                </div>
+                <h3 className="text-xl font-bold text-white">Complete & Verify Payment</h3>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <h3 className="text-2xl font-bold text-white">PayPal Payment Launched</h3>
-              <p className="text-sm text-slate-300">
-                Your payment link for <b className="text-white">${totalPrice} USD</b> was opened in a secure PayPal tab.
-              </p>
-            </div>
+            {!pendingOrderId ? (
+              <form onSubmit={handleVerifyCheckoutTx} className="space-y-4">
+                <div className="p-3.5 rounded-xl bg-[#0B1121] border border-white/10 text-xs text-slate-300 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Buyer Email:</span>
+                    <span className="font-mono text-white font-semibold">{buyerEmail}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Amount Due ({usersCount} user{usersCount > 1 ? 's' : ''}):</span>
+                    <span className="font-bold text-[#ffa41b]">${totalPrice} USD</span>
+                  </div>
+                </div>
 
-            <div className="p-4 rounded-xl bg-[#0B1121] border border-white/10 text-xs text-slate-400 text-left space-y-2">
-              <div className="font-semibold text-white">Next steps:</div>
-              <ol className="list-decimal pl-4 space-y-1">
-                <li>Complete your checkout on the PayPal screen.</li>
-                <li>Once paid, click the button below to download your Serial Placer extension and script immediately!</li>
-              </ol>
-            </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-white block">
+                    Enter PayPal Transaction ID or License Key
+                  </label>
+                  <p className="text-[11px] text-[#9aa4b8] leading-relaxed">
+                    After completing checkout in the PayPal tab, paste your <b className="text-white">17-character PayPal Transaction ID</b> from your receipt (or your issued <span className="font-mono text-white">SP-XXXX-XXXX-XXXX</span> License Key) below:
+                  </p>
+                  <input
+                    type="text"
+                    required
+                    value={txIdInput}
+                    onChange={(e) => {
+                      setTxIdInput(e.target.value.toUpperCase());
+                      setTxError('');
+                    }}
+                    placeholder="e.g. 8XL9283746192837K or SP-XXXX-XXXX-XXXX"
+                    className="w-full px-4 py-3 rounded-xl bg-[#0B1121] border border-white/15 focus:border-[#ffa41b] text-sm font-mono text-white placeholder-slate-600 outline-none"
+                  />
+                </div>
 
-            <div className="space-y-2.5">
-              <button
-                onClick={() => {
-                  setShowCheckoutModal(false);
-                  onGoToThankYou('PAYPAL-CONFIRMED', usersCount);
-                }}
-                className="w-full py-3.5 bg-gradient-to-r from-[#37d67a] to-emerald-500 text-[#0b0d12] font-black rounded-xl hover:scale-[1.02] shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2"
-              >
-                <Check size={18} /> I've Completed Payment (Download Files)
-              </button>
+                {txError && (
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-start gap-2">
+                    <ShieldAlert size={16} className="text-red-400 shrink-0 mt-0.5" />
+                    <span>{txError}</span>
+                  </div>
+                )}
 
-              <button
-                onClick={() => window.open(PAYPAL_PAYMENT_URL, '_blank', 'noopener,noreferrer')}
-                className="w-full py-2.5 text-xs text-[#9aa4b8] hover:text-white transition-colors flex items-center justify-center gap-1.5"
-              >
-                <ExternalLink size={13} /> Re-open PayPal payment page
-              </button>
-            </div>
+                <div className="space-y-2.5 pt-1">
+                  <button
+                    type="submit"
+                    disabled={isSubmittingTx}
+                    className="w-full py-3.5 bg-gradient-to-r from-[#37d67a] to-emerald-500 text-[#0b0d12] font-black rounded-xl hover:scale-[1.01] shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  >
+                    {isSubmittingTx ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        <span>Verifying Payment...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={18} />
+                        <span>Verify Payment & Unlock Download</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => window.open(PAYPAL_PAYMENT_URL, '_blank', 'noopener,noreferrer')}
+                    className="w-full py-2.5 text-xs text-[#9aa4b8] hover:text-white transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <ExternalLink size={13} /> Re-open PayPal checkout page (${totalPrice} USD)
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                    <Clock size={16} className="animate-pulse" />
+                    <span>Payment Submitted — Live Verification Active</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Your PayPal Transaction ID (<span className="font-mono font-bold text-white">{pendingOrderId}</span>) has been logged in our security system for <b className="text-white">${totalPrice} USD</b>.
+                  </p>
+                  <p className="text-[11px] text-amber-200/90">
+                    Keep this window open or save your Transaction ID. As soon as your PayPal receipt is confirmed, <b className="text-white">this screen will automatically unlock your downloads in real time</b>.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <a
+                    href={`https://wa.me/971552178767?text=${encodeURIComponent(
+                      `Hi Nazrul Studio! I just completed my PayPal payment of $${totalPrice} USD for Serial Placer (${usersCount} user license).\n\nPayPal Transaction ID: ${pendingOrderId}\nBuyer Email: ${buyerEmail}\n\nPlease approve my order for instant download!`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-[#0b0d12] font-black text-xs flex items-center justify-center gap-2 transition-all shadow-lg"
+                  >
+                    <span>Send Instant Receipt on WhatsApp for 1-Min Unlock</span>
+                    <ExternalLink size={13} />
+                  </a>
+
+                  <a
+                    href={`mailto:hello@nazrulstudio.uk?subject=${encodeURIComponent(
+                      `PayPal Receipt Verification: ${pendingOrderId}`
+                    )}&body=${encodeURIComponent(
+                      `Hello Nazrul Studio,\n\nI have completed my PayPal payment of $${totalPrice} USD for Serial Placer (${usersCount} user license).\n\nPayPal Transaction ID: ${pendingOrderId}\nBuyer Email: ${buyerEmail}\n\nPlease activate my download link.`
+                    )}`}
+                    className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all"
+                  >
+                    <Mail size={13} /> Email Receipt to hello@nazrulstudio.uk
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

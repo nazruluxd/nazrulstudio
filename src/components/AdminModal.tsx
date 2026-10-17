@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect } from 'react';
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { AppData } from '../types';
 import { parseVideoUrl } from '../utils/videoUtils';
+import { AdminLicensesTab } from './AdminLicensesTab';
 
 // Authorized Gmail for Admin Panel Access
 export const AUTHORIZED_ADMIN_EMAIL = 'nazrulcxd@gmail.com';
@@ -67,23 +68,15 @@ export const AdminModal = ({
   initialTab,
   onNavigateToShop,
 }: AdminModalProps) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => auth.currentUser);
+  const [, setCurrentUser] = useState<User | null>(() => auth.currentUser);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    try {
-      const isAuthedSession = sessionStorage.getItem('nazrul_admin_authed') === 'true';
-      const user = auth.currentUser;
-      const isGoogleAdmin = user && user.email?.trim().toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase();
-      return isAuthedSession || Boolean(isGoogleAdmin);
-    } catch {
-      return false;
-    }
+    const user = auth.currentUser;
+    return Boolean(user && user.email?.trim().toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase());
   });
 
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const [showPasswordFallback, setShowPasswordFallback] = useState(false);
-  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [activeTab, setActiveTab] = useState(initialTab || 'global');
+  const [activeTab, setActiveTab] = useState(initialTab || 'licenses');
   const [isDragOver, setIsDragOver] = useState(false);
   const [saveSuccessNotice, setSaveSuccessNotice] = useState('');
 
@@ -93,11 +86,8 @@ export const AdminModal = ({
       setCurrentUser(user);
       if (user && user.email?.trim().toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
         setIsAuthenticated(true);
-        try {
-          sessionStorage.setItem('nazrul_admin_authed', 'true');
-        } catch {
-          // ignore
-        }
+      } else {
+        setIsAuthenticated(false);
       }
     });
     return () => unsubscribe();
@@ -177,30 +167,15 @@ export const AdminModal = ({
     }
   };
 
-  // Emergency master password fallback
-  const handlePasswordLogin = (e: FormEvent) => {
-    e.preventDefault();
-    if (password === 'Nazrul1010Feni1@#*') {
-      setIsAuthenticated(true);
-      setErrorMsg('');
-      try {
-        sessionStorage.setItem('nazrul_admin_authed', 'true');
-      } catch {
-        // ignore
-      }
-    } else {
-      setErrorMsg('Incorrect password. Access denied.');
-    }
-  };
-
   const navTabs = [
+    { id: 'licenses', label: 'Orders & Licenses', icon: KeyRound },
+    { id: 'shopVideo', label: 'Shop Demo Video', icon: Video },
     { id: 'global', label: 'Global & Hero', icon: LayoutDashboard },
     { id: 'visibility', label: 'Section Toggles', icon: Eye },
     { id: 'showcase', label: 'Project Showcase', icon: Layers },
     { id: 'portfolio', label: 'Portfolio Grid', icon: ImageIcon },
     { id: 'resume', label: 'Resume & Exp', icon: Briefcase },
     { id: 'skills', label: 'Skills', icon: Settings2 },
-    { id: 'shopVideo', label: 'Shop Demo Video', icon: Video },
   ];
 
   interface FieldDef {
@@ -1136,6 +1111,8 @@ export const AdminModal = ({
                   </div>
                 </div>
               )}
+
+              {activeTab === 'licenses' && <AdminLicensesTab />}
             </div>
           </div>
         ) : (
@@ -1147,10 +1124,10 @@ export const AdminModal = ({
                 </div>
                 <h3 className="text-2xl text-white font-bold tracking-tight">Admin Sign In</h3>
                 <p className="text-sm text-slate-400">
-                  Firebase Authentication Protected
+                  Firebase Google Authentication Protected
                 </p>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-300 text-xs font-mono">
-                  <span>Only:</span>
+                  <span>Authorized Only:</span>
                   <span className="font-bold">{AUTHORIZED_ADMIN_EMAIL}</span>
                 </div>
               </div>
@@ -1161,7 +1138,7 @@ export const AdminModal = ({
                 </div>
               )}
 
-              {/* Primary: Google Sign In with nazrulcxd@gmail.com */}
+              {/* Exclusive Google Sign In with nazrulcxd@gmail.com */}
               <div className="space-y-3 pt-2">
                 <button
                   type="button"
@@ -1197,38 +1174,8 @@ export const AdminModal = ({
                 </button>
 
                 <p className="text-[11px] text-center text-slate-500">
-                  Select your Google account <b className="text-slate-400">{AUTHORIZED_ADMIN_EMAIL}</b> in the popup window.
+                  Restricted strictly to <b className="text-slate-400">{AUTHORIZED_ADMIN_EMAIL}</b> via Firebase Authentication.
                 </p>
-              </div>
-
-              {/* Master Password Option Toggle */}
-              <div className="pt-2 border-t border-white/5 text-center">
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordFallback(!showPasswordFallback)}
-                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center gap-1.5"
-                >
-                  <KeyRound size={12} />
-                  <span>{showPasswordFallback ? 'Hide master password' : 'Or use master password'}</span>
-                </button>
-
-                {showPasswordFallback && (
-                  <form onSubmit={handlePasswordLogin} className="mt-4 space-y-3 animate-in fade-in duration-200">
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-[#131C31] border border-white/10 p-3 rounded-xl text-white focus:border-teal-400 outline-none transition-colors text-center text-sm tracking-widest"
-                      placeholder="Master password"
-                    />
-                    <button
-                      type="submit"
-                      className="w-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white p-3 rounded-xl font-bold text-sm hover:scale-[0.99] transition-transform shadow-lg shadow-teal-500/20"
-                    >
-                      Verify Password
-                    </button>
-                  </form>
-                )}
               </div>
             </div>
           </div>

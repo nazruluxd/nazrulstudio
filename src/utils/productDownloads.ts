@@ -1,3 +1,7 @@
+import { getVerifiedSessionToken, recordAuthorizedDownload } from './licenseSecurity';
+import { auth } from '../firebase';
+import { AUTHORIZED_ADMIN_EMAIL } from '../components/AdminModal';
+
 /**
  * Utilities to trigger downloads of the Serial Placer Adobe Illustrator extension & script files.
  */
@@ -196,11 +200,36 @@ export const SAMPLE_SERIALS_CONTENT = Array.from({ length: 200 }, (_, i) =>
   String(i + 1).padStart(4, '0')
 ).join('\n');
 
+
 /**
- * Downloads a file to the user's computer with given filename and content.
+ * Downloads a file to the user's computer ONLY if verified in Firestore or signed in as Admin.
  */
-export function triggerFileDownload(filename: string, content: string, mimeType: string = 'text/plain') {
-  const blob = new Blob([content], { type: mimeType });
+export async function triggerProtectedFileDownload(
+  filename: string,
+  content: string,
+  mimeType: string = 'text/plain'
+): Promise<boolean> {
+  const isAdmin =
+    auth.currentUser?.email?.toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase();
+  const session = getVerifiedSessionToken();
+
+  if (!isAdmin && !session) {
+    return false;
+  }
+
+  const codeToVerify = session?.licenseKey || session?.orderId || 'ADMIN';
+  const authorized = await recordAuthorizedDownload(codeToVerify);
+  if (!authorized) {
+    return false;
+  }
+
+  const licenseStamp = `// LICENSED TO: ${session?.buyerEmail || AUTHORIZED_ADMIN_EMAIL} | LICENSE KEY: ${session?.licenseKey || 'ADMIN-MASTER'} | ORDER: ${session?.orderId || 'ADMIN'}\n`;
+  const stampedContent =
+    filename.endsWith('.jsx') || filename.endsWith('.zxp')
+      ? licenseStamp + content
+      : content;
+
+  const blob = new Blob([stampedContent], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -209,36 +238,46 @@ export function triggerFileDownload(filename: string, content: string, mimeType:
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  return true;
 }
 
 /**
- * Triggers download of the .jsx script
+ * Triggers protected download of the .jsx script
  */
-export function downloadJsxScript() {
-  triggerFileDownload('Serial_Placer_v4.jsx', EXTENDSCRIPT_CONTENT, 'application/javascript');
+export async function downloadJsxScript(): Promise<boolean> {
+  return triggerProtectedFileDownload(
+    'Serial_Placer_v4.jsx',
+    EXTENDSCRIPT_CONTENT,
+    'application/javascript'
+  );
 }
 
 /**
- * Triggers download of the user guide
+ * Triggers protected download of the user guide
  */
-export function downloadUserGuide() {
-  triggerFileDownload('Serial_Placer_User_Guide.txt', USER_GUIDE_CONTENT, 'text/plain');
+export async function downloadUserGuide(): Promise<boolean> {
+  return triggerProtectedFileDownload(
+    'Serial_Placer_User_Guide.txt',
+    USER_GUIDE_CONTENT,
+    'text/plain'
+  );
 }
 
 /**
- * Triggers download of sample serial numbers
+ * Triggers protected download of sample serial numbers
  */
-export function downloadSampleSerials() {
-  triggerFileDownload('Sample_Serials.txt', SAMPLE_SERIALS_CONTENT, 'text/plain');
+export async function downloadSampleSerials(): Promise<boolean> {
+  return triggerProtectedFileDownload(
+    'Sample_Serials.txt',
+    SAMPLE_SERIALS_CONTENT,
+    'text/plain'
+  );
 }
 
 /**
- * Creates and triggers download of a .zxp extension package (or zip package).
- * Since a .zxp is a zip archive format used by Adobe CEP, we generate a valid zip package with
- * the extension manifest and files.
+ * Triggers protected download of the .zxp extension package
  */
-export function downloadZxpExtension() {
-  // In addition to script, we provide the full bundle as .zxp
+export async function downloadZxpExtension(): Promise<boolean> {
   const packageNotice = `Adobe ZXP Package for Serial Placer v4.0
 Includes:
 - CSXS/manifest.xml
@@ -247,6 +286,11 @@ Includes:
 ${USER_GUIDE_CONTENT}
 
 ${EXTENDSCRIPT_CONTENT}`;
-  
-  triggerFileDownload('SerialPlacer.zxp', packageNotice, 'application/octet-stream');
+
+  return triggerProtectedFileDownload(
+    'SerialPlacer.zxp',
+    packageNotice,
+    'application/octet-stream'
+  );
 }
+

@@ -112,9 +112,9 @@ export function App() {
     }
   }, [data]);
 
-  // Order state for thank you page
+  // Order state for thank you page (verified against Firestore)
   const [orderInfo, setOrderInfo] = useState<{ orderId: string; users: number }>({
-    orderId: 'PP-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+    orderId: '',
     users: 1,
   });
 
@@ -125,7 +125,7 @@ export function App() {
       const hash = window.location.hash;
 
       const params = new URLSearchParams(search);
-      const orderParam = params.get('order') || params.get('tx');
+      const orderParam = params.get('order') || params.get('tx') || params.get('license');
       const usersParam = params.get('users');
 
       if (orderParam || hash === '#thank-you' || params.get('view') === 'thank-you') {
@@ -150,13 +150,13 @@ export function App() {
         params.get('admin') === 'login' ||
         params.get('admin') === 'true'
       ) {
-        setAdminInitialTab('shopVideo');
+        setAdminInitialTab('licenses');
         setIsAdminOpen(true);
       }
     };
 
     // Global helper for developer/owner console access
-    (window as any).openAdmin = (tab = 'shopVideo') => {
+    (window as any).openAdmin = (tab = 'licenses') => {
       setAdminInitialTab(tab);
       setIsAdminOpen(true);
     };
@@ -165,7 +165,7 @@ export function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
-        setAdminInitialTab('shopVideo');
+        setAdminInitialTab('licenses');
         setIsAdminOpen((prev) => !prev);
       }
     };
