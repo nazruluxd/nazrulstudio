@@ -1,0 +1,6 @@
+{
+  "name": "Nazrul Studio",
+  "description": "Portfolio of Nazrul - Precision in Design & Production, specializing in structural packaging, branding, and digital products.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

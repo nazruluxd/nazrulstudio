@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "review": {
+      "title": "Customer Review",
+      "description": "Customer ratings and comments for products in the shop",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Reviewer display name"
+        },
+        "role": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Job role or title of the reviewer"
+        },
+        "company": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Company name or location"
+        },
+        "rating": {
+          "type": "number",
+          "description": "Star rating from 1 to 5"
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Relative or formatted review date"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Headline of the review"
+        },
+        "comment": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Review text"
+        },
+        "verifiedBuyer": {
+          "type": "boolean",
+          "description": "Whether the reviewer is a verified purchaser"
+        },
+        "helpfulCount": {
+          "type": "number",
+          "description": "Number of users who found this review helpful"
+        }
+      },
+      "required": ["name", "rating", "title", "comment"]
+    },
+    "siteConfig": {
+      "title": "Site Configuration",
+      "description": "Persisted site content and shop video settings",
+      "type": "object",
+      "properties": {
+        "global": {
+          "type": "object",
+          "description": "Global hero and contact configuration"
+        },
+        "visibility": {
+          "type": "object",
+          "description": "Section visibility toggle flags"
+        },
+        "shopVideo": {
+          "type": "object",
+          "description": "Shop interactive demo video and simulation configuration"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/reviews/{reviewId}": {
+      "schema": "review",
+      "description": "Customer reviews and testimonials for shop products"
+    },
+    "/siteConfig/{configId}": {
+      "schema": "siteConfig",
+      "description": "Global website configuration and demo video settings"
+    }
+  }
+}

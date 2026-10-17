@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Strictly authorize only nazrulcxd@gmail.com with verified email
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.email == 'nazrulcxd@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isValidReview(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.rating is number && data.rating >= 1 && data.rating <= 5
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.comment is string && data.comment.size() > 0 && data.comment.size() <= 2000
+        && (!('role' in data) || (data.role is string && data.role.size() <= 100))
+        && (!('company' in data) || (data.company is string && data.company.size() <= 100))
+        && (!('verifiedBuyer' in data) || data.verifiedBuyer is bool)
+        && (!('helpfulCount' in data) || data.helpfulCount is number);
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Customer Reviews collection - public read, validated create, helpfulCount update, admin delete
+    match /reviews/{reviewId} {
+      allow read: if isValidId(reviewId);
+      allow create: if isValidId(reviewId) && isValidReview(request.resource.data);
+      allow update: if isValidId(reviewId) 
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['helpfulCount'])
+        && request.resource.data.helpfulCount is number;
+      allow delete: if isValidId(reviewId) && isAdmin();
+    }
+
+    // Site Configuration (Shop Demo Video, Global details) - readable by all, writable only by nazrulcxd@gmail.com
+    match /siteConfig/{configId} {
+      allow read: if isValidId(configId);
+      allow write: if isValidId(configId) && isAdmin();
+    }
+
+    // Connection testing doc
+    match /test/{docId} {
+      allow read, write: if isValidId(docId);
+    }
+  }
+}
