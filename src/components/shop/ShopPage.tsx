@@ -102,32 +102,26 @@ export const ShopPage = ({
   // Real-time listener for pending order approval in Firestore
   useEffect(() => {
     if (!pendingOrderId) return;
-    const unsub = onSnapshot(
-      doc(db, 'orders', pendingOrderId),
-      (snap) => {
-        if (snap.exists()) {
-          const ord = snap.data() as OrderRecord;
-          if (ord.status === 'verified') {
-            saveVerifiedSessionToken({
-              orderId: ord.orderId,
-              licenseKey: ord.licenseKey || ord.orderId,
-              buyerEmail: ord.buyerEmail,
-              users: ord.users || usersCount,
-              verifiedAt: Date.now(),
-            });
-            setShowCheckoutModal(false);
-            setPendingOrderId(null);
-            onGoToThankYou(ord.licenseKey || ord.orderId, ord.users || usersCount);
-          } else if (ord.status === 'revoked') {
-            setTxError('This transaction was declined or revoked by the administrator.');
-            setPendingOrderId(null);
-          }
+    const unsub = onSnapshot(doc(db, 'orders', pendingOrderId), (snap) => {
+      if (snap.exists()) {
+        const ord = snap.data() as OrderRecord;
+        if (ord.status === 'verified') {
+          saveVerifiedSessionToken({
+            orderId: ord.orderId,
+            licenseKey: ord.licenseKey || ord.orderId,
+            buyerEmail: ord.buyerEmail,
+            users: ord.users || usersCount,
+            verifiedAt: Date.now(),
+          });
+          setShowCheckoutModal(false);
+          setPendingOrderId(null);
+          onGoToThankYou(ord.licenseKey || ord.orderId, ord.users || usersCount);
+        } else if (ord.status === 'revoked') {
+          setTxError('This transaction was declined or revoked by the administrator.');
+          setPendingOrderId(null);
         }
-      },
-      (err) => {
-        console.warn('Order listener error:', err);
       }
-    );
+    });
     return () => unsub();
   }, [pendingOrderId, usersCount, onGoToThankYou]);
 

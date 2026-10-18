@@ -1,13 +1,12 @@
 {
   "projectId": "nazrulstudio",
-  "appId": "1:411865984200:web:48e74ad0416aba401e89fd",
+  "appId": "1:411865984200:web:7f1cc68b82a559711e89fd",
   "apiKey": "AIzaSyDolpPNW4ikGoIXZUJrtKdBRtNvzJu9ozQ",
   "authDomain": "nazrulstudio.firebaseapp.com",
-  "databaseURL": "https://nazrulstudio-default-rtdb.firebaseio.com",
   "firestoreDatabaseId": "ai-studio-nazrulstudio-3a110f7a-e7a4-42b9-9726-b3d2ba559de2",
   "storageBucket": "nazrulstudio.firebasestorage.app",
   "messagingSenderId": "411865984200",
-  "measurementId": "G-KQTZP0S5CF",
+  "measurementId": "",
   "oAuthClientId": "411865984200-bvilgtu18abasvlmfni2t3rubutabkbr.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

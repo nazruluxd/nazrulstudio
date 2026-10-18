@@ -7,7 +7,7 @@ import {
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import { db } from '../firebase';
 import {
   KeyRound,
   ShieldCheck,
@@ -43,56 +43,30 @@ export const AdminLicensesTab = () => {
   const [isCreatingLicense, setIsCreatingLicense] = useState(false);
 
   useEffect(() => {
-    const isAdminUser =
-      auth.currentUser?.email?.trim().toLowerCase() === 'nazrulcxd@gmail.com';
+    const unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
+      const list: OrderRecord[] = [];
+      snap.forEach((d) => list.push(d.data() as OrderRecord));
+      list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      setOrders(list);
+    });
 
-    let unsubOrders = () => {};
-    let unsubLicenses = () => {};
+    const unsubLicenses = onSnapshot(collection(db, 'licenses'), (snap) => {
+      const list: LicenseRecord[] = [];
+      snap.forEach((d) => list.push(d.data() as LicenseRecord));
+      list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      setLicenses(list);
+    });
 
-    if (isAdminUser) {
-      unsubOrders = onSnapshot(
-        collection(db, 'orders'),
-        (snap) => {
-          const list: OrderRecord[] = [];
-          snap.forEach((d) => list.push(d.data() as OrderRecord));
-          list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-          setOrders(list);
-        },
-        (error) => {
-          handleFirestoreError(error, OperationType.LIST, 'orders');
+    const unsubConfig = onSnapshot(doc(db, 'siteConfig', 'main'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data?.paymentSecurity?.requireManualApproval === false) {
+          setRequireManualApproval(false);
+        } else {
+          setRequireManualApproval(true);
         }
-      );
-
-      unsubLicenses = onSnapshot(
-        collection(db, 'licenses'),
-        (snap) => {
-          const list: LicenseRecord[] = [];
-          snap.forEach((d) => list.push(d.data() as LicenseRecord));
-          list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-          setLicenses(list);
-        },
-        (error) => {
-          handleFirestoreError(error, OperationType.LIST, 'licenses');
-        }
-      );
-    }
-
-    const unsubConfig = onSnapshot(
-      doc(db, 'siteConfig', 'main'),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data?.paymentSecurity?.requireManualApproval === false) {
-            setRequireManualApproval(false);
-          } else {
-            setRequireManualApproval(true);
-          }
-        }
-      },
-      (error) => {
-        handleFirestoreError(error, OperationType.GET, 'siteConfig/main');
       }
-    );
+    });
 
     return () => {
       unsubOrders();

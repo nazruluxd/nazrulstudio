@@ -1,25 +1,10 @@
 import { initializeApp } from 'firebase/app';
-import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase App
 export const app = initializeApp(firebaseConfig);
-
-// Initialize Firebase Analytics (safely in browser environments)
-export let analytics: Analytics | null = null;
-if (typeof window !== 'undefined') {
-  isSupported()
-    .then((supported) => {
-      if (supported) {
-        analytics = getAnalytics(app);
-      }
-    })
-    .catch(() => {
-      // Ignore analytics blocked by ad-blockers or iframe policies
-    });
-}
 
 // Initialize Firestore with specific firestoreDatabaseId (CRITICAL constraint)
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
