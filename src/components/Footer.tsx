@@ -1,13 +1,14 @@
-import { Code } from 'lucide-react';
+import { Code, Globe } from 'lucide-react';
 import { NavMenuItem } from '../types';
 import { socialLinks } from '../data/initialData';
 
 interface FooterProps {
   navItems: NavMenuItem[];
   onOpenAdmin: () => void;
+  onOpenSitemap?: () => void;
 }
 
-export const Footer = ({ navItems, onOpenAdmin }: FooterProps) => {
+export const Footer = ({ navItems, onOpenAdmin, onOpenSitemap }: FooterProps) => {
   return (
     <footer className="border-t border-white/5 bg-[#080d18] pt-12 md:pt-16 pb-8 md:pb-12 relative z-10">
       <div className="max-w-7xl mx-auto px-6 md:px-12 text-center md:text-left">
@@ -71,27 +72,43 @@ export const Footer = ({ navItems, onOpenAdmin }: FooterProps) => {
 
         {/* Bottom bar */}
         <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
-          <p
-            onClick={() => {
-              const now = Date.now();
-              if ((window as any).__adminClickTime && now - (window as any).__adminClickTime < 1500) {
-                (window as any).__adminClickCount = ((window as any).__adminClickCount || 1) + 1;
-                if ((window as any).__adminClickCount >= 3) {
-                  (window as any).__adminClickCount = 0;
-                  onOpenAdmin();
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+            <p
+              onClick={() => {
+                const now = Date.now();
+                if ((window as any).__adminClickTime && now - (window as any).__adminClickTime < 1500) {
+                  (window as any).__adminClickCount = ((window as any).__adminClickCount || 1) + 1;
+                  if ((window as any).__adminClickCount >= 3) {
+                    (window as any).__adminClickCount = 0;
+                    onOpenAdmin();
+                  }
+                } else {
+                  (window as any).__adminClickCount = 1;
                 }
-              } else {
-                (window as any).__adminClickCount = 1;
-              }
-              (window as any).__adminClickTime = now;
-            }}
-            className="text-slate-500 text-[10px] md:text-sm font-medium flex items-center gap-2 select-none"
-          >
-            © {new Date().getFullYear()} Nazrul Studio. All rights reserved.
-            <span className="mx-1 text-white/10 hidden md:inline">|</span>
-            <br className="md:hidden" />
-            Based in Dubai, UAE
-          </p>
+                (window as any).__adminClickTime = now;
+              }}
+              className="text-slate-500 text-[10px] md:text-sm font-medium flex items-center gap-2 select-none"
+            >
+              © {new Date().getFullYear()} Nazrul Studio. All rights reserved.
+              <span className="mx-1 text-white/10 hidden md:inline">|</span>
+              <br className="md:hidden" />
+              Based in Dubai, UAE
+            </p>
+
+            {onOpenSitemap && (
+              <>
+                <span className="text-white/10 hidden md:inline">|</span>
+                <button
+                  type="button"
+                  onClick={onOpenSitemap}
+                  className="text-[11px] md:text-xs font-semibold text-teal-400/90 hover:text-teal-300 flex items-center gap-1.5 transition-colors"
+                >
+                  <Globe size={13} />
+                  <span>Sitemap XML</span>
+                </button>
+              </>
+            )}
+          </div>
 
           <div className="flex items-center gap-2 text-slate-600 text-[10px] md:text-sm font-bold bg-white/5 px-3 md:px-4 py-1.5 rounded-lg">
             <Code size={14} className="text-teal-400" />
@@ -104,3 +121,4 @@ export const Footer = ({ navItems, onOpenAdmin }: FooterProps) => {
     </footer>
   );
 };
+

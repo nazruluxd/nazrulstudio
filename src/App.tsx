@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './firebase';
-import { applyDynamicSeo } from './utils/seoManager';
 import { initialData, navItems } from './data/initialData';
-import { AppData, NavMenuItem } from './types';
+import { AppData, NavMenuItem, PortfolioItem, ShowcaseItem } from './types';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { About } from './components/About';
@@ -19,10 +18,18 @@ import { Resume } from './components/Resume';
 import { Contact } from './components/Contact';
 import { Footer } from './components/Footer';
 import { WhatsAppFloating } from './components/WhatsAppFloating';
+import { ScrollNavigator } from './components/ScrollNavigator';
+import { SitemapModal } from './components/SitemapModal';
 import { AdminModal } from './components/AdminModal';
 import { ShopPage } from './components/shop/ShopPage';
 import { ThankYouPage } from './components/shop/ThankYouPage';
-import { GlobalLoadingOverlay } from './components/GlobalLoadingOverlay';
+import {
+  generateStructuredDataJsonLd,
+  SHOP_ITEMS,
+  ShopProductItem,
+  slugify,
+} from './utils/sitemapGenerator';
+import { useDynamicSeo } from './utils/useDynamicSeo';
 
 type ViewMode = 'home' | 'shop' | 'thank-you';
 
@@ -31,153 +38,70 @@ export function App() {
   const [activeSection, setActiveSection] = useState('home');
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const isRemoteSnapshotUpdate = useRef(false);
-  const isInitialMount = useRef(true);
-
   const [data, setData] = useState<AppData>(() => {
     try {
       const saved = localStorage.getItem('nazrul_studio_app_data_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
-        const resolvedPortfolio =
-          Array.isArray(parsed.portfolio) && parsed.portfolio.length > 0
-            ? parsed.portfolio
-            : initialData.portfolio;
-        const resolvedShowcase =
-          Array.isArray(parsed.showcase) && parsed.showcase.length > 0
-            ? parsed.showcase
-            : initialData.showcase;
-        const resolvedSkills =
-          Array.isArray(parsed.skills) && parsed.skills.length > 0
-            ? parsed.skills
-            : initialData.skills;
-        const resolvedExperience =
-          Array.isArray(parsed.experience) && parsed.experience.length > 0
-            ? parsed.experience
-            : initialData.experience;
-        const resolvedEducation =
-          Array.isArray(parsed.education) && parsed.education.length > 0
-            ? parsed.education
-            : initialData.education;
-
-        // Ensure visibility is never blanked out
-        const resolvedVisibility = {
-          ...initialData.visibility,
-          ...(parsed.visibility || {}),
-        };
-        // Guarantee critical core sections are visible
-        if (
-          !resolvedVisibility.hero &&
-          !resolvedVisibility.portfolio &&
-          !resolvedVisibility.skills
-        ) {
-          resolvedVisibility.hero = true;
-          resolvedVisibility.portfolio = true;
-          resolvedVisibility.skills = true;
-        }
-
         return {
           ...initialData,
           ...parsed,
           global: { ...initialData.global, ...(parsed.global || {}) },
-          visibility: resolvedVisibility,
+          visibility: { ...initialData.visibility, ...(parsed.visibility || {}) },
           shopVideo: { ...initialData.shopVideo, ...(parsed.shopVideo || {}) },
-          portfolio: resolvedPortfolio,
-          showcase: resolvedShowcase,
-          skills: resolvedSkills,
-          experience: resolvedExperience,
-          education: resolvedEducation,
         };
       }
     } catch {
-      // Fallback on corrupt JSON or blocked storage
+      // ignore
     }
     return initialData;
   });
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [adminInitialTab, setAdminInitialTab] = useState('global');
-  const [isAppHydrating, setIsAppHydrating] = useState(true);
-  const [loadingStatusText, setLoadingStatusText] = useState(
-    'Hydrating studio workspace...'
-  );
+  const [isSitemapOpen, setIsSitemapOpen] = useState(false);
 
-  // Update dynamic SEO tags whenever currentView changes
-  useEffect(() => {
-    applyDynamicSeo(currentView);
-  }, [currentView]);
+  // Active viewed project / product states for dynamic SEO & OpenGraph metadata
+  const [activePortfolioItem, setActivePortfolioItem] = useState<PortfolioItem | null>(null);
+  const [activeShowcaseItem, setActiveShowcaseItem] = useState<ShowcaseItem | null>(null);
+  const [activeShopProduct, setActiveShopProduct] = useState<ShopProductItem | null>(null);
 
-  // Real-time sync from Firestore siteConfig with branded hydration overlay
+  // Dynamically update page-specific <title>, <meta name="description">, OpenGraph, Twitter Cards & JSON-LD
+  useDynamicSeo({
+    view: currentView,
+    activeSection,
+    activePortfolioItem,
+    activeShowcaseItem,
+    activeShopProduct,
+    data,
+  });
+
+  // Real-time sync from Firestore siteConfig
   useEffect(() => {
     const configPath = 'siteConfig/main';
-    setLoadingStatusText('Syncing live configuration from Firestore...');
-
-    // Safety fallback timer so slow/offline networks never block entry
-    const hydrationFallbackTimer = setTimeout(() => {
-      setIsAppHydrating(false);
-    }, 650);
-
     const unsubscribe = onSnapshot(
       doc(db, 'siteConfig', 'main'),
       (snapshot) => {
         if (snapshot.exists()) {
           const remoteData = snapshot.data();
-          isRemoteSnapshotUpdate.current = true;
           setData((prev) => ({
             ...prev,
             ...remoteData,
             global: { ...prev.global, ...(remoteData.global || {}) },
             visibility: { ...prev.visibility, ...(remoteData.visibility || {}) },
             shopVideo: { ...prev.shopVideo, ...(remoteData.shopVideo || {}) },
-            showcase:
-              Array.isArray(remoteData.showcase) && remoteData.showcase.length > 0
-                ? remoteData.showcase
-                : prev.showcase,
-            portfolio:
-              Array.isArray(remoteData.portfolio) && remoteData.portfolio.length > 0
-                ? remoteData.portfolio
-                : prev.portfolio,
-            experience:
-              Array.isArray(remoteData.experience) && remoteData.experience.length > 0
-                ? remoteData.experience
-                : prev.experience,
-            education:
-              Array.isArray(remoteData.education) && remoteData.education.length > 0
-                ? remoteData.education
-                : prev.education,
-            skills:
-              Array.isArray(remoteData.skills) && remoteData.skills.length > 0
-                ? remoteData.skills
-                : prev.skills,
           }));
         }
-        setLoadingStatusText('Studio workspace ready');
-        clearTimeout(hydrationFallbackTimer);
-        setIsAppHydrating(false);
       },
       (error) => {
         handleFirestoreError(error, OperationType.GET, configPath);
-        clearTimeout(hydrationFallbackTimer);
-        setIsAppHydrating(false);
       }
     );
 
-    return () => {
-      clearTimeout(hydrationFallbackTimer);
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
-  // Auto-persist local admin edits to Firestore and localStorage without echo loops
+  // Auto-persist changes to Firestore and localStorage
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    if (isRemoteSnapshotUpdate.current) {
-      isRemoteSnapshotUpdate.current = false;
-      return;
-    }
-
     try {
       const dataToSave = {
         ...data,
@@ -193,7 +117,7 @@ export function App() {
       };
       localStorage.setItem('nazrul_studio_app_data_v2', JSON.stringify(dataToSave));
 
-      // Sync to Firestore only if authenticated as authorized admin
+      // Sync to Firestore if authenticated as authorized admin
       const isGoogleAdmin = auth.currentUser?.email?.toLowerCase() === 'nazrulcxd@gmail.com';
       if (isGoogleAdmin) {
         setDoc(
@@ -202,11 +126,6 @@ export function App() {
             global: dataToSave.global,
             visibility: dataToSave.visibility,
             shopVideo: dataToSave.shopVideo,
-            showcase: dataToSave.showcase,
-            portfolio: dataToSave.portfolio,
-            experience: dataToSave.experience,
-            education: dataToSave.education,
-            skills: dataToSave.skills,
           },
           { merge: true }
         ).catch((err) => {
@@ -216,6 +135,21 @@ export function App() {
     } catch {
       // quota or private browsing
     }
+
+    // Dynamically update Schema.org JSON-LD for Google Search Indexing
+    try {
+      const origin = window.location.origin || 'https://nazrulstudio.uk';
+      let scriptEl = document.getElementById('dynamic-seo-jsonld') as HTMLScriptElement | null;
+      if (!scriptEl) {
+        scriptEl = document.createElement('script');
+        scriptEl.id = 'dynamic-seo-jsonld';
+        scriptEl.type = 'application/ld+json';
+        document.head.appendChild(scriptEl);
+      }
+      scriptEl.textContent = generateStructuredDataJsonLd(data, origin);
+    } catch {
+      // ignore DOM error
+    }
   }, [data]);
 
   // Order state for thank you page (verified against Firestore)
@@ -224,7 +158,7 @@ export function App() {
     users: 1,
   });
 
-  // Check URL query parameters or hash to support direct linking / bookmarking
+  // Check URL query parameters or hash to support direct linking / bookmarking & sitemap deep links
   useEffect(() => {
     const handleUrlChange = () => {
       const search = window.location.search;
@@ -233,6 +167,9 @@ export function App() {
       const params = new URLSearchParams(search);
       const orderParam = params.get('order') || params.get('tx') || params.get('license');
       const usersParam = params.get('users');
+      const portfolioParam = params.get('portfolio');
+      const projectParam = params.get('project');
+      const productParam = params.get('product');
 
       if (orderParam || hash === '#thank-you' || params.get('view') === 'thank-you') {
         if (orderParam) {
@@ -241,11 +178,62 @@ export function App() {
             users: usersParam ? parseInt(usersParam, 10) || 1 : 1,
           });
         }
+        setActivePortfolioItem(null);
+        setActiveShowcaseItem(null);
         setCurrentView('thank-you');
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      } else if (hash === '#shop' || params.get('view') === 'shop') {
+      } else if (hash === '#shop' || params.get('view') === 'shop' || productParam) {
+        const matchedProduct =
+          SHOP_ITEMS.find((p) => p.id === productParam || p.slug === productParam) ||
+          SHOP_ITEMS[0];
+        setActiveShopProduct(matchedProduct);
+        setActivePortfolioItem(null);
+        setActiveShowcaseItem(null);
         setCurrentView('shop');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (portfolioParam || projectParam) {
+        setCurrentView('home');
+        setActiveShopProduct(null);
+
+        if (portfolioParam) {
+          const matchedPortfolio = data.portfolio.find(
+            (item) =>
+              slugify(`${item.id}-${item.title}`) === portfolioParam ||
+              String(item.id) === portfolioParam
+          );
+          if (matchedPortfolio) {
+            setActivePortfolioItem(matchedPortfolio);
+            setActiveShowcaseItem(null);
+          }
+        } else if (projectParam) {
+          const matchedShowcase = data.showcase.find(
+            (item) =>
+              slugify(`${item.id}-${item.title}`) === projectParam ||
+              item.id === projectParam
+          );
+          if (matchedShowcase) {
+            setActiveShowcaseItem(matchedShowcase);
+            setActivePortfolioItem(null);
+          }
+        }
+
+        setTimeout(() => {
+          const targetId = hash
+            ? hash.substring(1)
+            : portfolioParam
+            ? 'portfolio'
+            : 'projects';
+          const el =
+            document.getElementById(targetId) ||
+            document.getElementById(portfolioParam ? 'portfolio' : 'projects');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 250);
+      }
+
+      if (hash === '#sitemap' || params.get('sitemap') === '1') {
+        setIsSitemapOpen(true);
       }
 
       // Secure direct URL admin trigger: #admin or ?admin=...
@@ -283,7 +271,7 @@ export function App() {
       window.removeEventListener('popstate', handleUrlChange);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [data.portfolio, data.showcase]);
 
   const navigateToView = (view: ViewMode, orderId?: string, users?: number) => {
     if (orderId) {
@@ -291,6 +279,13 @@ export function App() {
         orderId,
         users: users || 1,
       });
+    }
+    if (view === 'shop') {
+      setActiveShopProduct(SHOP_ITEMS[0]);
+      setActivePortfolioItem(null);
+      setActiveShowcaseItem(null);
+    } else if (view === 'home') {
+      setActiveShopProduct(null);
     }
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -397,17 +392,13 @@ export function App() {
   if (currentView === 'thank-you') {
     return (
       <>
-        <GlobalLoadingOverlay
-          isLoading={isAppHydrating}
-          statusText={loadingStatusText}
-          onBypass={() => setIsAppHydrating(false)}
-        />
         <ThankYouPage
           orderId={orderInfo.orderId}
           userCount={orderInfo.users}
           onBackToShop={() => navigateToView('shop')}
           onBackToPortfolio={() => navigateToView('home')}
         />
+        <ScrollNavigator accentColor="amber" />
       </>
     );
   }
@@ -416,11 +407,6 @@ export function App() {
   if (currentView === 'shop') {
     return (
       <div className="min-h-screen bg-[#0b0d12]">
-        <GlobalLoadingOverlay
-          isLoading={isAppHydrating}
-          statusText={loadingStatusText}
-          onBypass={() => setIsAppHydrating(false)}
-        />
         <ShopPage
           onBackToStudio={() => navigateToView('home')}
           onGoToThankYou={(orderId, users) =>
@@ -432,6 +418,9 @@ export function App() {
             setIsAdminOpen(true);
           }}
         />
+
+        <ScrollNavigator accentColor="amber" />
+        <WhatsAppFloating phone={data.global.contactPhone} />
 
         {/* Advanced Admin CMS Modal (Accessible in Shop Page) */}
         <AdminModal
@@ -452,12 +441,6 @@ export function App() {
   // Render Main Portfolio
   return (
     <div className="min-h-screen bg-[#0B1121] text-slate-300 font-sans selection:bg-[#FF6F61] selection:text-white overflow-x-hidden relative">
-      <GlobalLoadingOverlay
-        isLoading={isAppHydrating}
-        statusText={loadingStatusText}
-        onBypass={() => setIsAppHydrating(false)}
-      />
-
       {/* Top Navbar & Floating Mobile Bottom Bar */}
       <Navbar
         activeSection={activeSection}
@@ -483,11 +466,18 @@ export function App() {
         {data.visibility.whyUs && <WhyUs />}
 
         {data.visibility.projects && (
-          <ProjectShowcase showcase={data.showcase} />
+          <ProjectShowcase
+            showcase={data.showcase}
+            onActiveShowcaseChange={setActiveShowcaseItem}
+          />
         )}
 
         {data.visibility.portfolio && (
-          <Portfolio portfolio={data.portfolio} />
+          <Portfolio
+            portfolio={data.portfolio}
+            activePortfolioItem={activePortfolioItem}
+            onSelectPortfolioItem={setActivePortfolioItem}
+          />
         )}
 
         {data.visibility.testimonials && <Testimonials />}
@@ -501,17 +491,28 @@ export function App() {
         <Contact global={data.global} />
       </main>
 
-      {/* Footer with CMS Admin access */}
+      {/* Footer with CMS Admin & Dynamic Sitemap XML access */}
       <Footer
         navItems={filteredNavItems}
         onOpenAdmin={() => {
           setAdminInitialTab('global');
           setIsAdminOpen(true);
         }}
+        onOpenSitemap={() => setIsSitemapOpen(true)}
       />
+
+      {/* Bidirectional Top-to-Bottom & Bottom-to-Top Scroll Navigator */}
+      <ScrollNavigator accentColor="coral" />
 
       {/* Floating WhatsApp Quick Action Button */}
       <WhatsAppFloating phone={data.global.contactPhone} />
+
+      {/* Dynamic Sitemap XML Generator & Inspector Modal */}
+      <SitemapModal
+        isOpen={isSitemapOpen}
+        onClose={() => setIsSitemapOpen(false)}
+        data={data}
+      />
 
       {/* Advanced Admin CMS Modal */}
       <AdminModal

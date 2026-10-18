@@ -2,14 +2,31 @@ import { useEffect } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { SectionHeading } from './SectionHeading';
+import { LazyImage } from './LazyImage';
 import { ShowcaseItem } from '../types';
+import { slugify } from '../utils/sitemapGenerator';
+import { useIntersectionLazyLoad } from '../utils/useIntersectionLazyLoad';
 
 interface ProjectShowcaseProps {
   showcase: ShowcaseItem[];
+  onActiveShowcaseChange?: (item: ShowcaseItem | null) => void;
 }
 
-export const ProjectShowcase = ({ showcase }: ProjectShowcaseProps) => {
+export const ProjectShowcase = ({
+  showcase,
+  onActiveShowcaseChange,
+}: ProjectShowcaseProps) => {
+  // Defer GSAP ScrollTrigger initialization & showcase image loading until section approaches viewport
+  const { ref: sectionRef, hasIntersected: isShowcaseApproaching } =
+    useIntersectionLazyLoad<HTMLElement>({
+      rootMargin: '450px 0px',
+      threshold: 0.01,
+      triggerOnce: true,
+    });
+
   useEffect(() => {
+    if (!isShowcaseApproaching) return;
+
     let ctx: gsap.Context | undefined;
     let timer: ReturnType<typeof setTimeout>;
 
@@ -28,6 +45,22 @@ export const ProjectShowcase = ({ showcase }: ProjectShowcaseProps) => {
               end: `+=${cards.length * 100}%`,
               pin: true,
               scrub: 1,
+              onUpdate: (self) => {
+                if (!onActiveShowcaseChange || showcase.length === 0) return;
+                if (self.isActive) {
+                  const idx = Math.min(
+                    showcase.length - 1,
+                    Math.max(0, Math.floor(self.progress * showcase.length))
+                  );
+                  onActiveShowcaseChange(showcase[idx]);
+                }
+              },
+              onLeave: () => {
+                if (onActiveShowcaseChange) onActiveShowcaseChange(null);
+              },
+              onLeaveBack: () => {
+                if (onActiveShowcaseChange) onActiveShowcaseChange(null);
+              },
             },
           });
 
@@ -72,7 +105,7 @@ export const ProjectShowcase = ({ showcase }: ProjectShowcaseProps) => {
             }
           });
         });
-      }, 100);
+      }, 60);
     } catch (err) {
       console.error('Failed to load GSAP', err);
     }
@@ -81,11 +114,20 @@ export const ProjectShowcase = ({ showcase }: ProjectShowcaseProps) => {
       clearTimeout(timer);
       ctx?.revert();
     };
-  }, [showcase.length]);
+  }, [isShowcaseApproaching, showcase, onActiveShowcaseChange]);
+
+  const handleSelectShowcase = (item: ShowcaseItem) => {
+    if (onActiveShowcaseChange) {
+      onActiveShowcaseChange(item);
+    }
+    const slug = slugify(`${item.id}-${item.title}`);
+    window.history.replaceState(null, '', `?project=${slug}#project-${item.id}`);
+  };
 
   return (
     <section
       id="projects"
+      ref={sectionRef}
       className="layered-stack-container relative w-full min-h-[100dvh] flex flex-col items-center justify-center overflow-hidden bg-[#0B1121]"
     >
       <div className="absolute top-12 md:top-24 w-full z-20 px-6">
@@ -95,10 +137,12 @@ export const ProjectShowcase = ({ showcase }: ProjectShowcaseProps) => {
       </div>
 
       <div className="relative w-full max-w-6xl mx-auto h-[70vh] md:h-[75vh] mt-24 md:mt-16 px-6 md:px-12">
-        {showcase.map((item) => (
+        {showcase.map((item, idx) => (
           <div
             key={item.id}
-            className={`layered-card absolute top-0 left-6 right-6 md:left-12 md:right-12 h-full rounded-[2.5rem] md:rounded-[3rem] overflow-hidden ${item.bg} ${item.border} shadow-2xl flex flex-col lg:flex-row border will-change-transform`}
+            id={`project-${item.id}`}
+            onClick={() => handleSelectShowcase(item)}
+            className={`layered-card absolute top-0 left-6 right-6 md:left-12 md:right-12 h-full rounded-[2.5rem] md:rounded-[3rem] overflow-hidden ${item.bg} ${item.border} shadow-2xl flex flex-col lg:flex-row border will-change-transform cursor-pointer`}
           >
             <div className="lg:w-[40%] p-8 md:p-14 flex flex-col justify-center space-y-6">
               <div>
@@ -131,10 +175,14 @@ export const ProjectShowcase = ({ showcase }: ProjectShowcaseProps) => {
             </div>
 
             <div className="lg:w-[60%] h-full bg-white relative group overflow-hidden flex items-center justify-center p-4 md:p-8">
-              <img
+              <LazyImage
                 src={item.image}
                 alt={item.title}
-                loading="lazy"
+                width={1000}
+                height={750}
+                rootMargin="450px 0px"
+                priority={isShowcaseApproaching && idx === 0}
+                fallbackLabel={`${item.title} · ${item.category}`}
                 className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
               />
               <div className="absolute inset-0 shadow-[inset_0_0_100px_rgba(0,0,0,0.05)] pointer-events-none" />
