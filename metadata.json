@@ -1,6 +1,6 @@
 {
   "name": "Nazrul Studio",
-  "description": "Portfolio of Nazrul - Precision in Design & Production, specializing in structural packaging, branding, and digital products.",
+  "description": "Nazrul Studio – Structural Packaging Design, Brand Identity & Serial Placer v4 Adobe Illustrator Plugin for automated ticket, voucher, and print serial numbering.",
   "permissions": [],
   "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

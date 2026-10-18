@@ -1,0 +1,22 @@
+{
+  "name": "nazrulstudio-functions",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Server-side Cloud Functions for verifying Firestore payment status and minting Firebase Storage V4 Signed Download URLs",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions,storage,firestore:rules"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

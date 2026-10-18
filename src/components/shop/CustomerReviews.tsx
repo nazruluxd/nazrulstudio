@@ -169,6 +169,9 @@ export const CustomerReviews = () => {
   }, [reviews]);
 
   const handleHelpfulClick = async (id: string) => {
+    const targetReview = reviews.find((r) => r.id === id);
+    const isUnvoting = Boolean(targetReview?.userVotedHelpful);
+
     setReviews((prev) =>
       prev.map((rev) => {
         if (rev.id === id) {
@@ -192,11 +195,11 @@ export const CustomerReviews = () => {
     // Also attempt to update Firestore helpfulCount
     try {
       await updateDoc(doc(db, 'reviews', id), {
-        helpfulCount: increment(1),
+        helpfulCount: increment(isUnvoting ? -1 : 1),
       });
     } catch (error) {
       // Review might be a local default or offline; handled gracefully
-      console.warn('Could not increment remote review helpfulCount', error);
+      console.warn('Could not update remote review helpfulCount', error);
     }
   };
 

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './firebase';
+import { applyDynamicSeo } from './utils/seoManager';
 import { initialData, navItems } from './data/initialData';
 import { AppData, NavMenuItem } from './types';
 import { Navbar } from './components/Navbar';
@@ -21,6 +22,7 @@ import { WhatsAppFloating } from './components/WhatsAppFloating';
 import { AdminModal } from './components/AdminModal';
 import { ShopPage } from './components/shop/ShopPage';
 import { ThankYouPage } from './components/shop/ThankYouPage';
+import { GlobalLoadingOverlay } from './components/GlobalLoadingOverlay';
 
 type ViewMode = 'home' | 'shop' | 'thank-you';
 
@@ -29,54 +31,153 @@ export function App() {
   const [activeSection, setActiveSection] = useState('home');
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isRemoteSnapshotUpdate = useRef(false);
+  const isInitialMount = useRef(true);
+
   const [data, setData] = useState<AppData>(() => {
     try {
       const saved = localStorage.getItem('nazrul_studio_app_data_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
+        const resolvedPortfolio =
+          Array.isArray(parsed.portfolio) && parsed.portfolio.length > 0
+            ? parsed.portfolio
+            : initialData.portfolio;
+        const resolvedShowcase =
+          Array.isArray(parsed.showcase) && parsed.showcase.length > 0
+            ? parsed.showcase
+            : initialData.showcase;
+        const resolvedSkills =
+          Array.isArray(parsed.skills) && parsed.skills.length > 0
+            ? parsed.skills
+            : initialData.skills;
+        const resolvedExperience =
+          Array.isArray(parsed.experience) && parsed.experience.length > 0
+            ? parsed.experience
+            : initialData.experience;
+        const resolvedEducation =
+          Array.isArray(parsed.education) && parsed.education.length > 0
+            ? parsed.education
+            : initialData.education;
+
+        // Ensure visibility is never blanked out
+        const resolvedVisibility = {
+          ...initialData.visibility,
+          ...(parsed.visibility || {}),
+        };
+        // Guarantee critical core sections are visible
+        if (
+          !resolvedVisibility.hero &&
+          !resolvedVisibility.portfolio &&
+          !resolvedVisibility.skills
+        ) {
+          resolvedVisibility.hero = true;
+          resolvedVisibility.portfolio = true;
+          resolvedVisibility.skills = true;
+        }
+
         return {
           ...initialData,
           ...parsed,
           global: { ...initialData.global, ...(parsed.global || {}) },
-          visibility: { ...initialData.visibility, ...(parsed.visibility || {}) },
+          visibility: resolvedVisibility,
           shopVideo: { ...initialData.shopVideo, ...(parsed.shopVideo || {}) },
+          portfolio: resolvedPortfolio,
+          showcase: resolvedShowcase,
+          skills: resolvedSkills,
+          experience: resolvedExperience,
+          education: resolvedEducation,
         };
       }
     } catch {
-      // ignore
+      // Fallback on corrupt JSON or blocked storage
     }
     return initialData;
   });
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [adminInitialTab, setAdminInitialTab] = useState('global');
+  const [isAppHydrating, setIsAppHydrating] = useState(true);
+  const [loadingStatusText, setLoadingStatusText] = useState(
+    'Hydrating studio workspace...'
+  );
 
-  // Real-time sync from Firestore siteConfig
+  // Update dynamic SEO tags whenever currentView changes
+  useEffect(() => {
+    applyDynamicSeo(currentView);
+  }, [currentView]);
+
+  // Real-time sync from Firestore siteConfig with branded hydration overlay
   useEffect(() => {
     const configPath = 'siteConfig/main';
+    setLoadingStatusText('Syncing live configuration from Firestore...');
+
+    // Safety fallback timer so slow/offline networks never block entry
+    const hydrationFallbackTimer = setTimeout(() => {
+      setIsAppHydrating(false);
+    }, 650);
+
     const unsubscribe = onSnapshot(
       doc(db, 'siteConfig', 'main'),
       (snapshot) => {
         if (snapshot.exists()) {
           const remoteData = snapshot.data();
+          isRemoteSnapshotUpdate.current = true;
           setData((prev) => ({
             ...prev,
             ...remoteData,
             global: { ...prev.global, ...(remoteData.global || {}) },
             visibility: { ...prev.visibility, ...(remoteData.visibility || {}) },
             shopVideo: { ...prev.shopVideo, ...(remoteData.shopVideo || {}) },
+            showcase:
+              Array.isArray(remoteData.showcase) && remoteData.showcase.length > 0
+                ? remoteData.showcase
+                : prev.showcase,
+            portfolio:
+              Array.isArray(remoteData.portfolio) && remoteData.portfolio.length > 0
+                ? remoteData.portfolio
+                : prev.portfolio,
+            experience:
+              Array.isArray(remoteData.experience) && remoteData.experience.length > 0
+                ? remoteData.experience
+                : prev.experience,
+            education:
+              Array.isArray(remoteData.education) && remoteData.education.length > 0
+                ? remoteData.education
+                : prev.education,
+            skills:
+              Array.isArray(remoteData.skills) && remoteData.skills.length > 0
+                ? remoteData.skills
+                : prev.skills,
           }));
         }
+        setLoadingStatusText('Studio workspace ready');
+        clearTimeout(hydrationFallbackTimer);
+        setIsAppHydrating(false);
       },
       (error) => {
         handleFirestoreError(error, OperationType.GET, configPath);
+        clearTimeout(hydrationFallbackTimer);
+        setIsAppHydrating(false);
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(hydrationFallbackTimer);
+      unsubscribe();
+    };
   }, []);
 
-  // Auto-persist changes to Firestore and localStorage
+  // Auto-persist local admin edits to Firestore and localStorage without echo loops
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (isRemoteSnapshotUpdate.current) {
+      isRemoteSnapshotUpdate.current = false;
+      return;
+    }
+
     try {
       const dataToSave = {
         ...data,
@@ -92,7 +193,7 @@ export function App() {
       };
       localStorage.setItem('nazrul_studio_app_data_v2', JSON.stringify(dataToSave));
 
-      // Sync to Firestore if authenticated as authorized admin
+      // Sync to Firestore only if authenticated as authorized admin
       const isGoogleAdmin = auth.currentUser?.email?.toLowerCase() === 'nazrulcxd@gmail.com';
       if (isGoogleAdmin) {
         setDoc(
@@ -101,6 +202,11 @@ export function App() {
             global: dataToSave.global,
             visibility: dataToSave.visibility,
             shopVideo: dataToSave.shopVideo,
+            showcase: dataToSave.showcase,
+            portfolio: dataToSave.portfolio,
+            experience: dataToSave.experience,
+            education: dataToSave.education,
+            skills: dataToSave.skills,
           },
           { merge: true }
         ).catch((err) => {
@@ -290,12 +396,19 @@ export function App() {
   // Render Thank You Download Page
   if (currentView === 'thank-you') {
     return (
-      <ThankYouPage
-        orderId={orderInfo.orderId}
-        userCount={orderInfo.users}
-        onBackToShop={() => navigateToView('shop')}
-        onBackToPortfolio={() => navigateToView('home')}
-      />
+      <>
+        <GlobalLoadingOverlay
+          isLoading={isAppHydrating}
+          statusText={loadingStatusText}
+          onBypass={() => setIsAppHydrating(false)}
+        />
+        <ThankYouPage
+          orderId={orderInfo.orderId}
+          userCount={orderInfo.users}
+          onBackToShop={() => navigateToView('shop')}
+          onBackToPortfolio={() => navigateToView('home')}
+        />
+      </>
     );
   }
 
@@ -303,6 +416,11 @@ export function App() {
   if (currentView === 'shop') {
     return (
       <div className="min-h-screen bg-[#0b0d12]">
+        <GlobalLoadingOverlay
+          isLoading={isAppHydrating}
+          statusText={loadingStatusText}
+          onBypass={() => setIsAppHydrating(false)}
+        />
         <ShopPage
           onBackToStudio={() => navigateToView('home')}
           onGoToThankYou={(orderId, users) =>
@@ -334,6 +452,12 @@ export function App() {
   // Render Main Portfolio
   return (
     <div className="min-h-screen bg-[#0B1121] text-slate-300 font-sans selection:bg-[#FF6F61] selection:text-white overflow-x-hidden relative">
+      <GlobalLoadingOverlay
+        isLoading={isAppHydrating}
+        statusText={loadingStatusText}
+        onBypass={() => setIsAppHydrating(false)}
+      />
+
       {/* Top Navbar & Floating Mobile Bottom Bar */}
       <Navbar
         activeSection={activeSection}

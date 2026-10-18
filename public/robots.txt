@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap for Nazrul Studio & Serial Placer Product Store
+Sitemap: https://nazrulstudio.uk/sitemap.xml

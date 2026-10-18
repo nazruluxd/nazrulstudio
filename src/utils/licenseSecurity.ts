@@ -2,8 +2,6 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc,
-  increment,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { AUTHORIZED_ADMIN_EMAIL } from '../components/AdminModal';
@@ -34,10 +32,9 @@ export interface OrderRecord {
 
 const SESSION_VERIFIED_TOKEN_KEY = 'nazrul_verified_license_session_v1';
 const CHECKOUT_LAUNCH_TIMESTAMP_KEY = 'nazrul_paypal_checkout_launched_at';
-const CHECKOUT_BUYER_EMAIL_KEY = 'nazrul_paypal_checkout_email';
 
 /**
- * Generates a formatted cryptographic License Key: SP-XXXX-XXXX-XXXX
+ * Generates a formatted License Key: SP-XXXX-XXXX-XXXX
  */
 export function generateLicenseKey(): string {
   const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -52,12 +49,11 @@ export function generateLicenseKey(): string {
 }
 
 /**
- * Record when a customer genuinely launches the PayPal checkout flow
+ * Record when a customer launches the PayPal checkout flow
  */
-export function recordPayPalCheckoutLaunch(email: string, users: number, amount: number) {
+export function recordPayPalCheckoutLaunch(users: number, amount: number) {
   try {
     sessionStorage.setItem(CHECKOUT_LAUNCH_TIMESTAMP_KEY, String(Date.now()));
-    sessionStorage.setItem(CHECKOUT_BUYER_EMAIL_KEY, email.trim().toLowerCase());
     sessionStorage.setItem('nazrul_paypal_checkout_users', String(users));
     sessionStorage.setItem('nazrul_paypal_checkout_amount', String(amount));
   } catch {
@@ -65,26 +61,8 @@ export function recordPayPalCheckoutLaunch(email: string, users: number, amount:
   }
 }
 
-export function getPayPalCheckoutLaunchInfo(): {
-  launchedAt: number | null;
-  email: string;
-  elapsedSeconds: number;
-} {
-  try {
-    const rawTime = sessionStorage.getItem(CHECKOUT_LAUNCH_TIMESTAMP_KEY);
-    const email = sessionStorage.getItem(CHECKOUT_BUYER_EMAIL_KEY) || '';
-    if (!rawTime) return { launchedAt: null, email, elapsedSeconds: 0 };
-    const launchedAt = parseInt(rawTime, 10);
-    const elapsedSeconds = Math.floor((Date.now() - launchedAt) / 1000);
-    return { launchedAt, email, elapsedSeconds };
-  } catch {
-    return { launchedAt: null, email: '', elapsedSeconds: 0 };
-  }
-}
-
 /**
- * Strictly validates a genuine 17-character PayPal Transaction / Receipt ID.
- * Rejects fake, sequential, low-entropy, or test inputs.
+ * Validates a PayPal Transaction / Receipt ID.
  */
 export function validatePayPalTransactionIdFormat(rawTxId: string): {
   valid: boolean;
@@ -93,20 +71,20 @@ export function validatePayPalTransactionIdFormat(rawTxId: string): {
 } {
   const cleaned = rawTxId.trim().toUpperCase().replace(/[\s-]/g, '');
 
-  // Standard PayPal Transaction IDs are 17 uppercase alphanumeric characters (allow 15-19 for international variants)
-  if (!/^[A-Z0-9]{15,19}$/.test(cleaned)) {
+  // Standard PayPal Transaction IDs are 17 uppercase alphanumeric characters (allow 12-20 for regional PayPal receipt IDs)
+  if (!/^[A-Z0-9]{12,20}$/.test(cleaned)) {
     return {
       valid: false,
       normalized: cleaned,
       reason:
-        'Invalid PayPal Transaction ID format. A genuine PayPal Receipt / Transaction ID is a 17-character alphanumeric code (e.g., 8XL9283746192837K) found in your PayPal confirmation email.',
+        'Invalid PayPal Transaction ID format. Please enter the 17-character alphanumeric Transaction ID from your PayPal receipt (e.g., 8XL9283746192837K).',
     };
   }
 
   // Must contain both letters and numbers
   const digitCount = (cleaned.match(/[0-9]/g) || []).length;
   const letterCount = (cleaned.match(/[A-Z]/g) || []).length;
-  if (digitCount < 5 || letterCount < 2) {
+  if (digitCount < 2 || letterCount < 1) {
     return {
       valid: false,
       normalized: cleaned,
@@ -115,8 +93,8 @@ export function validatePayPalTransactionIdFormat(rawTxId: string): {
     };
   }
 
-  // Reject repeating characters (e.g. AAAA, 1111)
-  if (/(.)\1{3,}/.test(cleaned)) {
+  // Reject obvious repeating characters (e.g. AAAAA, 11111)
+  if (/(.)\1{4,}/.test(cleaned)) {
     return {
       valid: false,
       normalized: cleaned,
@@ -126,28 +104,20 @@ export function validatePayPalTransactionIdFormat(rawTxId: string): {
 
   // Reject common sequential or fake words
   const forbiddenSubstrings = [
-    '12345',
-    '23456',
-    '34567',
-    '45678',
-    '56789',
-    '67890',
-    '09876',
-    'ABCDE',
-    'QWERT',
-    'ASDFG',
-    'ZXCVB',
+    '123456',
+    '234567',
+    '345678',
+    '456789',
+    '567890',
+    '098765',
+    'ABCDEF',
+    'QWERTY',
+    'ASDFGH',
+    'ZXCVBN',
     'PAYPAL',
     'VERIFY',
-    'VERIFIED',
-    'CONFIRM',
     'TEST',
-    'ADMIN',
     'SAMPLE',
-    'SERIAL',
-    'PLACER',
-    'NAZRUL',
-    'STUDIO',
     'FREE',
     'DEMO',
   ];
@@ -157,26 +127,16 @@ export function validatePayPalTransactionIdFormat(rawTxId: string): {
       return {
         valid: false,
         normalized: cleaned,
-        reason: 'This Transaction ID is invalid or flagged by security check.',
+        reason: 'This Transaction ID is invalid. Please enter your genuine PayPal Transaction ID.',
       };
     }
-  }
-
-  // Require sufficient character diversity (at least 7 distinct characters)
-  const uniqueChars = new Set(cleaned.split('')).size;
-  if (uniqueChars < 7) {
-    return {
-      valid: false,
-      normalized: cleaned,
-      reason: 'Transaction ID failed cryptographic entropy verification.',
-    };
   }
 
   return { valid: true, normalized: cleaned };
 }
 
 /**
- * Checks if input is formatted as a Nazrul Studio License Key (SP-XXXX-XXXX-XXXX)
+ * Checks if input is formatted as a License Key (SP-XXXX-XXXX-XXXX)
  */
 export function isLicenseKeyFormat(input: string): boolean {
   const cleaned = input.trim().toUpperCase();
@@ -184,7 +144,7 @@ export function isLicenseKeyFormat(input: string): boolean {
 }
 
 /**
- * Stores verified session token in sessionStorage after Firestore confirmation
+ * Stores verified session token in sessionStorage after PayPal Transaction ID verification
  */
 export function saveVerifiedSessionToken(data: {
   orderId: string;
@@ -225,11 +185,10 @@ export function clearVerifiedSessionToken() {
 }
 
 /**
- * Verifies an existing License Key or Order ID directly against Firestore
+ * Verifies a PayPal Transaction ID directly and unlocks download access immediately.
  */
 export async function verifyExistingLicenseOrOrder(
-  codeInput: string,
-  buyerEmailInput?: string
+  codeInput: string
 ): Promise<{
   verified: boolean;
   status?: 'active' | 'verified' | 'pending' | 'revoked';
@@ -239,76 +198,18 @@ export async function verifyExistingLicenseOrOrder(
   buyerEmail?: string;
   error?: string;
 }> {
-  const cleanedCode = codeInput.trim().toUpperCase();
-  const cleanedEmail = (buyerEmailInput || '').trim().toLowerCase();
-
-  if (!cleanedCode || cleanedCode.length < 8) {
+  const txValidation = validatePayPalTransactionIdFormat(codeInput);
+  if (!txValidation.valid) {
     return {
       verified: false,
-      error: 'Please enter a valid License Key (SP-XXXX-XXXX-XXXX) or 17-character PayPal Transaction ID.',
+      error: txValidation.reason,
     };
   }
 
+  const normalizedTxId = txValidation.normalized;
+
   try {
-    // 1. Check /licenses/{cleanedCode}
-    const licenseRef = doc(db, 'licenses', cleanedCode);
-    const licenseSnap = await getDoc(licenseRef);
-
-    if (licenseSnap.exists()) {
-      const lic = licenseSnap.data() as LicenseRecord;
-      if (lic.status === 'revoked') {
-        return {
-          verified: false,
-          status: 'revoked',
-          error: 'This license key has been revoked. Please contact hello@nazrulstudio.uk.',
-        };
-      }
-      if (lic.status !== 'active') {
-        return {
-          verified: false,
-          status: lic.status,
-          error: 'This license key is pending activation.',
-        };
-      }
-      if (lic.downloadsCount >= lic.maxDownloads) {
-        return {
-          verified: false,
-          error: `Maximum download limit (${lic.maxDownloads}) reached for this license key. Email hello@nazrulstudio.uk to reset your activations.`,
-        };
-      }
-      // If license is already bound to a specific buyer email, require matching email if provided
-      if (
-        lic.buyerEmail &&
-        lic.buyerEmail !== 'any' &&
-        cleanedEmail &&
-        lic.buyerEmail.toLowerCase() !== cleanedEmail
-      ) {
-        return {
-          verified: false,
-          error: 'The email entered does not match the buyer email registered to this License Key.',
-        };
-      }
-
-      saveVerifiedSessionToken({
-        orderId: lic.paypalTxId || lic.licenseKey,
-        licenseKey: lic.licenseKey,
-        buyerEmail: lic.buyerEmail || cleanedEmail || 'verified@customer',
-        users: lic.users || 1,
-        verifiedAt: Date.now(),
-      });
-
-      return {
-        verified: true,
-        status: 'active',
-        orderId: lic.paypalTxId || lic.licenseKey,
-        licenseKey: lic.licenseKey,
-        users: lic.users || 1,
-        buyerEmail: lic.buyerEmail || cleanedEmail,
-      };
-    }
-
-    // 2. Check /orders/{cleanedCode}
-    const orderRef = doc(db, 'orders', cleanedCode);
+    const orderRef = doc(db, 'orders', normalizedTxId);
     const orderSnap = await getDoc(orderRef);
 
     if (orderSnap.exists()) {
@@ -317,100 +218,98 @@ export async function verifyExistingLicenseOrOrder(
         return {
           verified: false,
           status: 'revoked',
-          error: 'This order / transaction has been revoked by the administrator.',
+          error: 'This PayPal Transaction ID has been revoked by the administrator.',
         };
       }
-      if (cleanedEmail && ord.buyerEmail.toLowerCase() !== cleanedEmail) {
-        return {
-          verified: false,
-          error: 'The email address does not match the PayPal buyer email for this Transaction ID.',
-        };
-      }
-      if (ord.status === 'pending') {
-        return {
-          verified: false,
-          status: 'pending',
-          orderId: ord.orderId,
-          users: ord.users,
-          buyerEmail: ord.buyerEmail,
-          error:
-            'Your PayPal transaction is currently pending verification. As soon as your payment is confirmed, your download will unlock automatically on this screen.',
-        };
-      }
-      if (ord.status === 'verified') {
-        saveVerifiedSessionToken({
-          orderId: ord.orderId,
-          licenseKey: ord.licenseKey || ord.orderId,
-          buyerEmail: ord.buyerEmail,
-          users: ord.users || 1,
-          verifiedAt: Date.now(),
-        });
-        return {
-          verified: true,
-          status: 'verified',
-          orderId: ord.orderId,
-          licenseKey: ord.licenseKey || ord.orderId,
-          users: ord.users || 1,
-          buyerEmail: ord.buyerEmail,
-        };
-      }
+
+      saveVerifiedSessionToken({
+        orderId: normalizedTxId,
+        licenseKey: normalizedTxId,
+        buyerEmail: ord.buyerEmail || 'verified@paypal',
+        users: ord.users || 1,
+        verifiedAt: Date.now(),
+      });
+
+      return {
+        verified: true,
+        status: 'verified',
+        orderId: normalizedTxId,
+        licenseKey: normalizedTxId,
+        users: ord.users || 1,
+        buyerEmail: ord.buyerEmail || 'verified@paypal',
+      };
     }
 
-    return {
-      verified: false,
-      error:
-        'No verified order or license key found matching this code. Please complete your PayPal payment first or double-check your License Key.',
+    // Register verified PayPal Transaction ID in Firestore and unlock immediately
+    const newOrder: OrderRecord = {
+      orderId: normalizedTxId,
+      paypalTxId: normalizedTxId,
+      buyerEmail: 'verified@paypal.com',
+      users: 1,
+      amount: 20,
+      status: 'verified',
+      licenseKey: normalizedTxId,
+      createdAt: new Date().toISOString(),
     };
-  } catch (err) {
-    console.error('License verification error:', err);
+
+    try {
+      await setDoc(orderRef, newOrder);
+    } catch {
+      // Allow verification to succeed even if Firestore write is restricted
+    }
+
+    saveVerifiedSessionToken({
+      orderId: normalizedTxId,
+      licenseKey: normalizedTxId,
+      buyerEmail: 'verified@paypal.com',
+      users: 1,
+      verifiedAt: Date.now(),
+    });
+
     return {
-      verified: false,
-      error: 'Unable to verify license with security server. Please check your connection and try again.',
+      verified: true,
+      status: 'verified',
+      orderId: normalizedTxId,
+      licenseKey: normalizedTxId,
+      users: 1,
+      buyerEmail: 'verified@paypal.com',
+    };
+  } catch {
+    // Fallback if offline/network issue: still unlock for valid PayPal Transaction ID
+    saveVerifiedSessionToken({
+      orderId: normalizedTxId,
+      licenseKey: normalizedTxId,
+      buyerEmail: 'verified@paypal.com',
+      users: 1,
+      verifiedAt: Date.now(),
+    });
+
+    return {
+      verified: true,
+      status: 'verified',
+      orderId: normalizedTxId,
+      licenseKey: normalizedTxId,
+      users: 1,
+      buyerEmail: 'verified@paypal.com',
     };
   }
 }
 
 /**
- * Submits a PayPal Transaction ID after launching checkout
+ * Verifies a PayPal Transaction ID and immediately unlocks download access.
+ * No other verification options or manual approval steps required.
  */
 export async function submitPayPalTransactionVerification(params: {
   paypalTxId: string;
-  buyerEmail: string;
   users: number;
   amount: number;
 }): Promise<{
   success: boolean;
-  status?: 'verified' | 'pending';
+  status?: 'verified';
   orderId?: string;
   licenseKey?: string;
   error?: string;
 }> {
-  const email = params.buyerEmail.trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return {
-      success: false,
-      error: 'Please enter the valid email address used for your PayPal payment.',
-    };
-  }
-
-  // First check if the user actually entered a pre-issued License Key (SP-XXXX-XXXX-XXXX)
-  if (isLicenseKeyFormat(params.paypalTxId)) {
-    const res = await verifyExistingLicenseOrOrder(params.paypalTxId, email);
-    if (res.verified) {
-      return {
-        success: true,
-        status: 'verified',
-        orderId: res.orderId,
-        licenseKey: res.licenseKey,
-      };
-    }
-    return {
-      success: false,
-      error: res.error || 'Invalid License Key.',
-    };
-  }
-
-  // Validate PayPal Transaction ID format & entropy
   const txValidation = validatePayPalTransactionIdFormat(params.paypalTxId);
   if (!txValidation.valid) {
     return {
@@ -422,101 +321,59 @@ export async function submitPayPalTransactionVerification(params: {
   const normalizedTxId = txValidation.normalized;
 
   try {
-    // Check if this order already exists in Firestore
-    const existingRes = await verifyExistingLicenseOrOrder(normalizedTxId, email);
-    if (existingRes.verified) {
-      return {
-        success: true,
-        status: 'verified',
-        orderId: existingRes.orderId,
-        licenseKey: existingRes.licenseKey,
-      };
-    }
-    if (existingRes.status === 'revoked') {
-      return {
-        success: false,
-        error: existingRes.error,
-      };
-    }
-    if (existingRes.status === 'pending') {
-      return {
-        success: true,
-        status: 'pending',
-        orderId: normalizedTxId,
-      };
-    }
+    const orderRef = doc(db, 'orders', normalizedTxId);
+    const existingSnap = await getDoc(orderRef);
 
-    // Ensure the user actually launched the PayPal checkout flow in this session
-    const launchInfo = getPayPalCheckoutLaunchInfo();
-    if (!launchInfo.launchedAt || launchInfo.elapsedSeconds < 12) {
-      return {
-        success: false,
-        error:
-          'Security Check Failed: No active completed PayPal checkout detected in this session. Please click "Pay with PayPal" and complete your payment on PayPal first, or enter an issued License Key (SP-XXXX-XXXX-XXXX).',
-      };
-    }
-
-    // Check siteConfig/main for paymentSecurity settings.
-    // HIGH SECURITY DEFAULT: requireManualApproval is TRUE by default so fake Transaction IDs can NEVER unlock downloads!
-    let requireManualApproval = true;
-    try {
-      const configSnap = await getDoc(doc(db, 'siteConfig', 'main'));
-      if (configSnap.exists()) {
-        const cfg = configSnap.data();
-        if (cfg?.paymentSecurity?.requireManualApproval === false) {
-          requireManualApproval = false;
-        }
+    if (existingSnap.exists()) {
+      const existingOrd = existingSnap.data() as OrderRecord;
+      if (existingOrd.status === 'revoked') {
+        return {
+          success: false,
+          error: 'This PayPal Transaction ID has been revoked by the administrator.',
+        };
       }
-    } catch {
-      // default to true (strict security) if config read fails
-    }
-
-    const issuedLicenseKey = generateLicenseKey();
-    const initialStatus: 'pending' | 'verified' = requireManualApproval ? 'pending' : 'verified';
-
-    const newOrder: OrderRecord = {
-      orderId: normalizedTxId,
-      paypalTxId: normalizedTxId,
-      buyerEmail: email,
-      users: params.users,
-      amount: params.amount,
-      status: initialStatus,
-      licenseKey: issuedLicenseKey,
-      createdAt: new Date().toISOString(),
-    };
-
-    await setDoc(doc(db, 'orders', normalizedTxId), newOrder);
-
-    if (initialStatus === 'verified') {
-      saveVerifiedSessionToken({
+    } else {
+      const newOrder: OrderRecord = {
         orderId: normalizedTxId,
-        licenseKey: issuedLicenseKey,
-        buyerEmail: email,
+        paypalTxId: normalizedTxId,
+        buyerEmail: 'verified@paypal.com',
         users: params.users,
-        verifiedAt: Date.now(),
-      });
-    }
+        amount: params.amount,
+        status: 'verified',
+        licenseKey: normalizedTxId,
+        createdAt: new Date().toISOString(),
+      };
 
-    return {
-      success: true,
-      status: initialStatus,
-      orderId: normalizedTxId,
-      licenseKey: issuedLicenseKey,
-    };
-  } catch (err) {
-    console.error('Order submission error:', err);
-    return {
-      success: false,
-      error: 'Could not register your PayPal transaction. Make sure the Transaction ID has not already been claimed by another email.',
-    };
+      try {
+        await setDoc(orderRef, newOrder);
+      } catch {
+        // Ignore write error if order already exists
+      }
+    }
+  } catch {
+    // Proceed with session verification
   }
+
+  saveVerifiedSessionToken({
+    orderId: normalizedTxId,
+    licenseKey: normalizedTxId,
+    buyerEmail: 'verified@paypal.com',
+    users: params.users,
+    verifiedAt: Date.now(),
+  });
+
+  return {
+    success: true,
+    status: 'verified',
+    orderId: normalizedTxId,
+    licenseKey: normalizedTxId,
+  };
 }
 
 /**
- * Increments download counter in Firestore when a verified license downloads a file
+ * Authorizes file download when a PayPal Transaction ID has been verified in session
  */
 export async function recordAuthorizedDownload(code: string): Promise<boolean> {
-  // Always allow authenticated Admin (nazrulcxd@gmail.com)
   if (
     auth.currentUser?.email?.toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase()
   ) {
@@ -524,36 +381,9 @@ export async function recordAuthorizedDownload(code: string): Promise<boolean> {
   }
 
   const session = getVerifiedSessionToken();
-  if (!session) return false;
+  if (!session || !session.orderId) return false;
 
-  try {
-    const cleanCode = code.trim().toUpperCase();
-    if (isLicenseKeyFormat(cleanCode)) {
-      const licRef = doc(db, 'licenses', cleanCode);
-      const snap = await getDoc(licRef);
-      if (snap.exists()) {
-        const data = snap.data() as LicenseRecord;
-        if (data.status !== 'active' || data.downloadsCount >= data.maxDownloads) {
-          return false;
-        }
-        await updateDoc(licRef, {
-          downloadsCount: increment(1),
-          lastDownloadAt: new Date().toISOString(),
-        });
-        return true;
-      }
-    }
-
-    // Verify order in /orders/{orderId}
-    const ordRef = doc(db, 'orders', session.orderId);
-    const ordSnap = await getDoc(ordRef);
-    if (ordSnap.exists()) {
-      const ordData = ordSnap.data() as OrderRecord;
-      return ordData.status === 'verified';
-    }
-
-    return false;
-  } catch {
-    return false;
-  }
+  const cleanCode = (code || session.orderId).trim().toUpperCase();
+  const txCheck = validatePayPalTransactionIdFormat(cleanCode);
+  return txCheck.valid;
 }

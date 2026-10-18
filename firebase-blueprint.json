@@ -26,7 +26,7 @@
         },
         "date": {
           "type": "string",
-          "maxLength": 50,
+          "maxLength": 64,
           "description": "Relative or formatted review date"
         },
         "title": {
@@ -52,7 +52,7 @@
     },
     "siteConfig": {
       "title": "Site Configuration",
-      "description": "Persisted site content, shop video settings, and payment security config",
+      "description": "Persisted site content, portfolio sections, shop video settings, and payment security config",
       "type": "object",
       "properties": {
         "global": {
@@ -66,6 +66,26 @@
         "shopVideo": {
           "type": "object",
           "description": "Shop interactive demo video and simulation configuration"
+        },
+        "showcase": {
+          "type": "array",
+          "description": "Layered project showcase items"
+        },
+        "portfolio": {
+          "type": "array",
+          "description": "Selected works portfolio grid items"
+        },
+        "experience": {
+          "type": "array",
+          "description": "Work experience entries"
+        },
+        "education": {
+          "type": "array",
+          "description": "Education entries"
+        },
+        "skills": {
+          "type": "array",
+          "description": "Primary skills proficiency bars"
         },
         "paymentSecurity": {
           "type": "object",
@@ -118,6 +138,11 @@
           "type": "string",
           "maxLength": 64,
           "description": "ISO timestamp of creation"
+        },
+        "lastDownloadAt": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ISO timestamp of most recent file download"
         }
       },
       "required": ["licenseKey", "status", "users"]

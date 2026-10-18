@@ -17,22 +17,36 @@ export const FadeIn = ({
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Safety fallback timer: guarantees content becomes visible in preview iframes
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, 150 + delay);
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true);
+      return () => clearTimeout(timer);
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setIsVisible(true);
+          clearTimeout(timer);
           if (ref.current) observer.unobserve(ref.current);
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.01, rootMargin: '100px' }
     );
 
     if (ref.current) {
       observer.observe(ref.current);
     }
 
-    return () => observer.disconnect();
-  }, []);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [delay]);
 
   let offset = '';
   switch (direction) {

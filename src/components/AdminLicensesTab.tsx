@@ -1,4 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
   doc,
@@ -7,7 +8,7 @@ import {
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import {
   KeyRound,
   ShieldCheck,
@@ -43,32 +44,67 @@ export const AdminLicensesTab = () => {
   const [isCreatingLicense, setIsCreatingLicense] = useState(false);
 
   useEffect(() => {
-    const unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
-      const list: OrderRecord[] = [];
-      snap.forEach((d) => list.push(d.data() as OrderRecord));
-      list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-      setOrders(list);
-    });
+    let unsubOrders = () => {};
+    let unsubLicenses = () => {};
 
-    const unsubLicenses = onSnapshot(collection(db, 'licenses'), (snap) => {
-      const list: LicenseRecord[] = [];
-      snap.forEach((d) => list.push(d.data() as LicenseRecord));
-      list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-      setLicenses(list);
-    });
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      unsubOrders();
+      unsubLicenses();
 
-    const unsubConfig = onSnapshot(doc(db, 'siteConfig', 'main'), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data?.paymentSecurity?.requireManualApproval === false) {
-          setRequireManualApproval(false);
-        } else {
-          setRequireManualApproval(true);
-        }
+      const isAdminUser =
+        user?.email?.trim().toLowerCase() === 'nazrulcxd@gmail.com';
+
+      if (isAdminUser) {
+        unsubOrders = onSnapshot(
+          collection(db, 'orders'),
+          (snap) => {
+            const list: OrderRecord[] = [];
+            snap.forEach((d) => list.push(d.data() as OrderRecord));
+            list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+            setOrders(list);
+          },
+          (error) => {
+            handleFirestoreError(error, OperationType.LIST, 'orders');
+          }
+        );
+
+        unsubLicenses = onSnapshot(
+          collection(db, 'licenses'),
+          (snap) => {
+            const list: LicenseRecord[] = [];
+            snap.forEach((d) => list.push(d.data() as LicenseRecord));
+            list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+            setLicenses(list);
+          },
+          (error) => {
+            handleFirestoreError(error, OperationType.LIST, 'licenses');
+          }
+        );
+      } else {
+        setOrders([]);
+        setLicenses([]);
       }
     });
 
+    const unsubConfig = onSnapshot(
+      doc(db, 'siteConfig', 'main'),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data?.paymentSecurity?.requireManualApproval === false) {
+            setRequireManualApproval(false);
+          } else {
+            setRequireManualApproval(true);
+          }
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, 'siteConfig/main');
+      }
+    );
+
     return () => {
+      unsubAuth();
       unsubOrders();
       unsubLicenses();
       unsubConfig();
@@ -99,15 +135,15 @@ export const AdminLicensesTab = () => {
           : 'Automated Receipt Verification Mode enabled.'
       );
     } catch (err) {
-      console.error('Error updating security mode:', err);
+      handleFirestoreError(err, OperationType.WRITE, 'siteConfig/main');
     }
   };
 
   const handleGenerateLicense = async (e: FormEvent) => {
     e.preventDefault();
     setIsCreatingLicense(true);
+    const key = generateLicenseKey();
     try {
-      const key = generateLicenseKey();
       const emailClean = newBuyerEmail.trim().toLowerCase() || 'any';
       const newLic: LicenseRecord = {
         licenseKey: key,
@@ -125,15 +161,15 @@ export const AdminLicensesTab = () => {
       setNewBuyerEmail('');
       flashNotice(`Generated & activated License Key: ${key}`);
     } catch (err) {
-      console.error('Failed to generate license:', err);
+      handleFirestoreError(err, OperationType.CREATE, `licenses/${key}`);
     } finally {
       setIsCreatingLicense(false);
     }
   };
 
   const handleApproveOrder = async (ord: OrderRecord) => {
+    const licKey = ord.licenseKey || generateLicenseKey();
     try {
-      const licKey = ord.licenseKey || generateLicenseKey();
       await updateDoc(doc(db, 'orders', ord.orderId), {
         status: 'verified',
         licenseKey: licKey,
@@ -154,7 +190,7 @@ export const AdminLicensesTab = () => {
       await setDoc(doc(db, 'licenses', licKey), newLic);
       flashNotice(`Order ${ord.orderId} approved! Customer download unlocked live.`);
     } catch (err) {
-      console.error('Failed to approve order:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `orders/${ord.orderId}`);
     }
   };
 
@@ -165,7 +201,7 @@ export const AdminLicensesTab = () => {
       });
       flashNotice(`Order ${orderId} revoked.`);
     } catch (err) {
-      console.error('Failed to revoke order:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `orders/${orderId}`);
     }
   };
 
@@ -174,7 +210,7 @@ export const AdminLicensesTab = () => {
       await deleteDoc(doc(db, 'orders', orderId));
       flashNotice(`Order ${orderId} deleted.`);
     } catch (err) {
-      console.error('Failed to delete order:', err);
+      handleFirestoreError(err, OperationType.DELETE, `orders/${orderId}`);
     }
   };
 
@@ -186,7 +222,7 @@ export const AdminLicensesTab = () => {
       });
       flashNotice(`License ${lic.licenseKey} set to ${nextStatus}.`);
     } catch (err) {
-      console.error('Failed to update license:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `licenses/${lic.licenseKey}`);
     }
   };
 
@@ -195,7 +231,7 @@ export const AdminLicensesTab = () => {
       await deleteDoc(doc(db, 'licenses', licenseKey));
       flashNotice(`License ${licenseKey} deleted.`);
     } catch (err) {
-      console.error('Failed to delete license:', err);
+      handleFirestoreError(err, OperationType.DELETE, `licenses/${licenseKey}`);
     }
   };
 
