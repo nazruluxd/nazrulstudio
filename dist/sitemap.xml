@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+>
+  <url>
+    <loc>https://nazrulstudio.uk/</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/#about</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/#skills</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/#projects</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/#portfolio</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/#resume</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/#contact</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?view=shop</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?view=shop&amp;product=serial-placer</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?project=p1-branding#project-p1</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://www.dropbox.com/scl/fi/1p6nboyv0b7d5vvgohfz4/1ae2ef150f0dbc8921668f8d7f1aa0b2.jpg?rlkey=y2grwmdg3fof8lftd8a55txu5&amp;st=rcmx0097&amp;raw=1</image:loc>
+      <image:title>Branding | Identity Design – Nazrul Studio</image:title>
+      <image:caption>Crafting memorable visual identities that resonate with target audiences and drive brand recognition.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?project=p2-packaging-design#project-p2</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?project=p3-website-design#project-p3</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&amp;fit=crop&amp;w=1000&amp;q=80</image:loc>
+      <image:title>Website Design | Digital Experience – Nazrul Studio</image:title>
+      <image:caption>High-performance, conversion-focused websites featuring responsive layouts, intuitive user journeys, and premium modern aesthetics.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?project=p4-product-design#project-p4</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://www.dropbox.com/scl/fi/z2ebzgemogkhg6v1moutd/7239e4bc0ae548cbebaffc0400e56b66.jpg?rlkey=fhzqhfrhk4pjxr2a0mjyz5hyf&amp;st=zknpfese&amp;raw=1</image:loc>
+      <image:title>Product Design | Digital Interfaces – Nazrul Studio</image:title>
+      <image:caption>User-centric UI/UX design for digital products, focusing on seamless journeys and technical scalability.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=101-gourmet-burger-box#portfolio-101</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1626804475297-41609ea004eb?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Gourmet Burger Box – Food Packaging | Nazrul Studio</image:title>
+      <image:caption>Vibrant and structural food-grade packaging for fast-casual dining.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=102-craft-beverage-can#portfolio-102</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Craft Beverage Can – Beverage Packaging | Nazrul Studio</image:title>
+      <image:caption>Sleek aluminum can design for craft energy drinks and sodas.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=103-luxury-skincare-jar#portfolio-103</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Luxury Skincare Jar – Cosmetics &amp; Beauty | Nazrul Studio</image:title>
+      <image:caption>Premium frosted glass jar and minimalist label design.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=104-medical-dropper-box#portfolio-104</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Medical Dropper Box – Pharmaceutical Packaging | Nazrul Studio</image:title>
+      <image:caption>Clean, compliant, and secure folding carton for medical products.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=105-premium-watch-box#portfolio-105</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Premium Watch Box – Luxury Packaging | Nazrul Studio</image:title>
+      <image:caption>High-end rigid box with soft-touch finish and foil stamping.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=106-boutique-shopping-bag#portfolio-106</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1607004468138-c7e4f10bf835?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Boutique Shopping Bag – Retail Packaging | Nazrul Studio</image:title>
+      <image:caption>Custom printed retail carrier bags with premium rope handles.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=107-custom-mailer-box#portfolio-107</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1607344645866-bea1b490f05c?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Custom Mailer Box – E-commerce Packaging | Nazrul Studio</image:title>
+      <image:caption>Durable corrugated mailer optimized for unboxing experiences.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=108-eco-friendly-pouch#portfolio-108</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1559525839-b184a4d698c7?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Eco-Friendly Pouch – Sustainable Packaging | Nazrul Studio</image:title>
+      <image:caption>100% compostable kraft paper stand-up pouch.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=109-vintage-wine-label#portfolio-109</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1507290439931-a861b5a38200?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Vintage Wine Label – Labels &amp; Stickers | Nazrul Studio</image:title>
+      <image:caption>Textured paper label with embossed gold foil details.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=110-magnetic-closure-box#portfolio-110</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Magnetic Closure Box – Gift &amp; Rigid Boxes | Nazrul Studio</image:title>
+      <image:caption>Luxury gifting presentation with custom foam inserts.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=111-photorealistic-pouch#portfolio-111</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Photorealistic Pouch – 3D Packaging Mockups | Nazrul Studio</image:title>
+      <image:caption>Studio-grade 3D rendering for pre-production marketing.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=112-coffee-identity-system#portfolio-112</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Coffee Identity System – Packaging Branding Systems | Nazrul Studio</image:title>
+      <image:caption>Cohesive visual identity spanning across multiple packaging formats.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=113-urban-ad-campaign#portfolio-113</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1542204165-65bf26472b9b?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Urban Ad Campaign – Bill Board | Nazrul Studio</image:title>
+      <image:caption>High-impact outdoor advertising structural design.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=114-event-typography#portfolio-114</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1534337621606-e3df5a1413ac?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Event Typography – Poster Design | Nazrul Studio</image:title>
+      <image:caption>Bold, modern poster design for cultural exhibitions.</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nazrulstudio.uk/?portfolio=115-modern-tech-identity#portfolio-115</loc>
+    <lastmod>2026-10-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&amp;fit=crop&amp;w=800&amp;q=80</image:loc>
+      <image:title>Modern Tech Identity – Logo Design | Nazrul Studio</image:title>
+      <image:caption>Minimalist and scalable vector logo for a modern startup.</image:caption>
+    </image:image>
+  </url>
+</urlset>
